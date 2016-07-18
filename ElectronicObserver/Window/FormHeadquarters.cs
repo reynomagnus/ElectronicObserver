@@ -19,9 +19,12 @@ namespace ElectronicObserver.Window {
 
 	public partial class FormHeadquarters : DockContent {
 
+		private Form _parentForm;
+
 		public FormHeadquarters( FormMain parent ) {
 			InitializeComponent();
 
+			_parentForm = parent;
 
 
 			ImageList icons = ResourceManager.Instance.Icons;
@@ -74,6 +77,7 @@ namespace ElectronicObserver.Window {
 			o.APIList["api_req_kousyou/createship_speedchange"].RequestReceived += Updated;
 			o.APIList["api_req_kousyou/destroyship"].RequestReceived += Updated;
 			o.APIList["api_req_kousyou/destroyitem2"].RequestReceived += Updated;
+			o.APIList["api_req_member/updatecomment"].RequestReceived += Updated;
 
 			o.APIList["api_get_member/basic"].ResponseReceived += Updated;
 			o.APIList["api_get_member/slot_item"].ResponseReceived += Updated;
@@ -117,11 +121,74 @@ namespace ElectronicObserver.Window {
 					EquipmentCount.BackColor = Color.LightCoral;
 				}
 			}
+
+			//visibility
+			CheckVisibilityConfiguration();
+			{
+				var visibility = Utility.Configuration.Config.FormHeadquarters.Visibility.List;
+				AdmiralName.Visible = visibility[0];
+				AdmiralComment.Visible = visibility[1];
+				HQLevel.Visible = visibility[2];
+				ShipCount.Visible = visibility[3];
+				EquipmentCount.Visible = visibility[4];
+				InstantRepair.Visible = visibility[5];
+				InstantConstruction.Visible = visibility[6];
+				DevelopmentMaterial.Visible = visibility[7];
+				ModdingMaterial.Visible = visibility[8];
+				FurnitureCoin.Visible = visibility[9];
+				Fuel.Visible = visibility[10];
+				Ammo.Visible = visibility[11];
+				Steel.Visible = visibility[12];
+				Bauxite.Visible = visibility[13];
+			}
+
 		}
+
+
+		/// <summary>
+		/// VisibleFlags 設定をチェックし、不正な値だった場合は初期値に戻します。
+		/// </summary>
+		public static void CheckVisibilityConfiguration() {
+			const int count = 14;
+			var config = Utility.Configuration.Config.FormHeadquarters;
+
+			if ( config.Visibility == null )
+				config.Visibility = new Utility.Storage.SerializableList<bool>( Enumerable.Repeat( true, count ).ToList() );
+
+			for ( int i = config.Visibility.List.Count; i < count; i++ ) {
+				config.Visibility.List.Add( true );
+			}
+
+		}
+
+		/// <summary>
+		/// 各表示項目の名称を返します。
+		/// </summary>
+		public static IEnumerable<string> GetItemNames() {
+			yield return "提督名";
+			yield return "提督コメント";
+			yield return "司令部Lv";
+			yield return "艦船数";
+			yield return "装備数";
+			yield return "高速修復材";
+			yield return "高速建造材";
+			yield return "開発資材";
+			yield return "改修資材";
+			yield return "家具コイン";
+			yield return "燃料";
+			yield return "弾薬";
+			yield return "鋼材";
+			yield return "ボーキサイト";
+		}
+
 
 		void Updated( string apiname, dynamic data ) {
 
 			KCDatabase db = KCDatabase.Instance;
+
+
+			if ( !db.Admiral.IsAvailable )
+				return;
 
 
 			FlowPanelMaster.SuspendLayout();
@@ -195,13 +262,52 @@ namespace ElectronicObserver.Window {
 			}
 			FlowPanelFleet.ResumeLayout();
 
+
+
+			var resday = RecordManager.Instance.Resource.GetRecord( DateTime.Now.AddHours( -5 ).Date.AddHours( 5 ) );
+			var resweek = RecordManager.Instance.Resource.GetRecord( DateTime.Now.AddHours( -5 ).Date.AddDays( -( ( (int)DateTime.Now.AddHours( -5 ).DayOfWeek + 6 ) % 7 ) ).AddHours( 5 ) );	//月曜日起点
+			var resmonth = RecordManager.Instance.Resource.GetRecord( new DateTime( DateTime.Now.Year, DateTime.Now.Month, 1 ).AddHours( 5 ) );
+
+
 			//UseItems
 			FlowPanelUseItem.SuspendLayout();
+
 			InstantRepair.Text = db.Material.InstantRepair.ToString();
+			ToolTipInfo.SetToolTip( InstantRepair, string.Format( "今日: {0:+##;-##;±0}\n今週: {1:+##;-##;±0}\n今月: {2:+##;-##;±0}",
+					resday == null ? 0 : ( db.Material.InstantRepair - resday.InstantRepair ),
+					resweek == null ? 0 : ( db.Material.InstantRepair - resweek.InstantRepair ),
+					resmonth == null ? 0 : ( db.Material.InstantRepair - resmonth.InstantRepair ) ) );
+
 			InstantConstruction.Text = db.Material.InstantConstruction.ToString();
+			ToolTipInfo.SetToolTip( InstantConstruction, string.Format( "今日: {0:+##;-##;±0}\n今週: {1:+##;-##;±0}\n今月: {2:+##;-##;±0}",
+					resday == null ? 0 : ( db.Material.InstantConstruction - resday.InstantConstruction ),
+					resweek == null ? 0 : ( db.Material.InstantConstruction - resweek.InstantConstruction ),
+					resmonth == null ? 0 : ( db.Material.InstantConstruction - resmonth.InstantConstruction ) ) );
+
 			DevelopmentMaterial.Text = db.Material.DevelopmentMaterial.ToString();
+			ToolTipInfo.SetToolTip( DevelopmentMaterial, string.Format( "今日: {0:+##;-##;±0}\n今週: {1:+##;-##;±0}\n今月: {2:+##;-##;±0}",
+					resday == null ? 0 : ( db.Material.DevelopmentMaterial - resday.DevelopmentMaterial ),
+					resweek == null ? 0 : ( db.Material.DevelopmentMaterial - resweek.DevelopmentMaterial ),
+					resmonth == null ? 0 : ( db.Material.DevelopmentMaterial - resmonth.DevelopmentMaterial ) ) );
+
 			ModdingMaterial.Text = db.Material.ModdingMaterial.ToString();
+			ToolTipInfo.SetToolTip( ModdingMaterial, string.Format( "今日: {0:+##;-##;±0}\n今週: {1:+##;-##;±0}\n今月: {2:+##;-##;±0}",
+					resday == null ? 0 : ( db.Material.ModdingMaterial - resday.ModdingMaterial ),
+					resweek == null ? 0 : ( db.Material.ModdingMaterial - resweek.ModdingMaterial ),
+					resmonth == null ? 0 : ( db.Material.ModdingMaterial - resmonth.ModdingMaterial ) ) );
+
 			FurnitureCoin.Text = db.Admiral.FurnitureCoin.ToString();
+			{
+				int small = db.UseItems[10] != null ? db.UseItems[10].Count : 0;
+				int medium = db.UseItems[11] != null ? db.UseItems[11].Count : 0;
+				int large = db.UseItems[12] != null ? db.UseItems[12].Count : 0;
+
+				ToolTipInfo.SetToolTip( FurnitureCoin,
+						string.Format( "(小) x {0} ( +{1} )\r\n(中) x {2} ( +{3} )\r\n(大) x {4} ( +{5} )\r\n",
+							small, small * 200,
+							medium, medium * 400,
+							large, large * 700 ) );
+			}
 			FlowPanelUseItem.ResumeLayout();
 
 
@@ -209,11 +315,6 @@ namespace ElectronicObserver.Window {
 			FlowPanelResource.SuspendLayout();
 			{
 				Color overcolor = Color.Moccasin;
-
-				var resday = RecordManager.Instance.Resource.GetRecord( DateTime.Now.AddHours( -5 ).Date.AddHours( 5 ) );
-				var resweek = RecordManager.Instance.Resource.GetRecord( DateTime.Now.AddHours( -5 ).Date.AddDays( -( ( (int)DateTime.Now.AddHours( -5 ).DayOfWeek + 6 ) % 7 ) ).AddHours( 5 ) );	//月曜日起点
-				var resmonth = RecordManager.Instance.Resource.GetRecord( new DateTime( DateTime.Now.Year, DateTime.Now.Month, 1 ).AddHours( 5 ) );
-
 
 				Fuel.Text = db.Material.Fuel.ToString();
 				Fuel.BackColor = db.Material.Fuel < db.Admiral.MaxResourceRegenerationAmount ? Color.Transparent : overcolor;
@@ -275,7 +376,8 @@ namespace ElectronicObserver.Window {
 
 		private void Resource_MouseClick( object sender, MouseEventArgs e ) {
 
-			new Dialog.DialogResourceChart().Show( this );
+			if ( e.Button == System.Windows.Forms.MouseButtons.Right )
+				new Dialog.DialogResourceChart().Show( _parentForm );
 
 		}
 

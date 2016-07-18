@@ -39,6 +39,7 @@ namespace ElectronicObserver.Data.Battle {
 			NightOnly,						//夜戦
 			NightDay,						//夜昼戦
 			AirBattle,						//航空戦
+			AirRaid,						//長距離空襲戦
 			Practice,						//演習
 			BattlePhaseMask = 0xFFFF,		//戦闘形態マスク
 			CombinedTaskForce = 0x10000,	//機動部隊
@@ -61,6 +62,28 @@ namespace ElectronicObserver.Data.Battle {
 		/// 出撃中に入手した装備数
 		/// </summary>
 		public int DroppedEquipmentCount { get; internal set; }
+
+		/// <summary>
+		/// 出撃中に入手したアイテム - ID と 個数 のペア
+		/// </summary>
+		public Dictionary<int, int> DroppedItemCount { get; internal set; }
+
+
+		/// <summary>
+		/// 演習の敵提督名
+		/// </summary>
+		public string EnemyAdmiralName { get; internal set; }
+
+		/// <summary>
+		/// 演習の敵提督階級
+		/// </summary>
+		public string EnemyAdmiralRank { get; internal set; }
+
+
+
+		public BattleManager() {
+			DroppedItemCount = new Dictionary<int, int>();
+		}
 
 
 		public override void LoadFromResponse( string apiname, dynamic data ) {
@@ -101,6 +124,12 @@ namespace ElectronicObserver.Data.Battle {
 					BattleDay.LoadFromResponse( apiname, data );
 					break;
 
+				case "api_req_sortie/ld_airbattle":
+					BattleMode = BattleModes.AirRaid;
+					BattleDay = new BattleAirRaid();
+					BattleDay.LoadFromResponse( apiname, data );
+					break;
+
 				case "api_req_combined_battle/battle":
 					BattleMode = BattleModes.Normal | BattleModes.CombinedTaskForce;
 					BattleDay = new BattleCombinedNormalDay();
@@ -131,6 +160,17 @@ namespace ElectronicObserver.Data.Battle {
 					BattleDay.LoadFromResponse( apiname, data );
 					break;
 
+				case "api_req_combined_battle/ld_airbattle":
+					BattleMode = BattleModes.AirRaid | BattleModes.CombinedTaskForce;
+					BattleDay = new BattleCombinedAirRaid();
+					BattleDay.LoadFromResponse( apiname, data );
+					break;
+
+				case "api_req_member/get_practice_enemyinfo":
+					EnemyAdmiralName = data.api_nickname;
+					EnemyAdmiralRank = Constants.GetAdmiralRank( (int)data.api_rank );
+					break;
+
 				case "api_req_practice/battle":
 					BattleMode = BattleModes.Practice;
 					BattleDay = new BattlePracticeDay();
@@ -158,8 +198,9 @@ namespace ElectronicObserver.Data.Battle {
 					Result = null;
 					BattleMode = BattleModes.Undefined;
 					DroppedShipCount = DroppedEquipmentCount = 0;
+					DroppedItemCount.Clear();
 					break;
-					
+
 				case "api_get_member/slot_item":
 					DroppedEquipmentCount = 0;
 					break;
@@ -175,17 +216,23 @@ namespace ElectronicObserver.Data.Battle {
 		private void BattleFinished() {
 
 			//敵編成記録
-			switch ( BattleMode & BattleModes.BattlePhaseMask ) {
-				case BattleModes.Normal:
-				case BattleModes.AirBattle:
-					RecordManager.Instance.EnemyFleet.Update( new EnemyFleetRecord.EnemyFleetElement( Compass.EnemyFleetID, Result.EnemyFleetName, BattleDay.Searching.FormationEnemy, BattleDay.Initial.EnemyMembers ) );
-					break;
+			EnemyFleetRecord.EnemyFleetElement enemyFleetData = EnemyFleetRecord.EnemyFleetElement.CreateFromCurrentState();
 
-				case BattleModes.NightOnly:
-				case BattleModes.NightDay:
-					RecordManager.Instance.EnemyFleet.Update( new EnemyFleetRecord.EnemyFleetElement( Compass.EnemyFleetID, Result.EnemyFleetName, BattleNight.Searching.FormationEnemy, BattleNight.Initial.EnemyMembers ) );
-					break;
+			if ( enemyFleetData != null )
+				RecordManager.Instance.EnemyFleet.Update( enemyFleetData );
+
+
+			// ロギング
+			if ( ( BattleMode & BattleModes.BattlePhaseMask ) == BattleModes.Practice ) {
+				Utility.Logger.Add( 2,
+					string.Format( "演習 で「{0}」{1}の「{2}」と交戦しました。( ランク: {3}, 提督Exp+{4}, 艦娘Exp+{5} )",
+						EnemyAdmiralName, EnemyAdmiralRank, Result.EnemyFleetName, Result.Rank, Result.AdmiralExp, Result.BaseExp ) );
+			} else {
+				Utility.Logger.Add( 2,
+					string.Format( "{0}-{1}-{2} で「{3}」と交戦しました。( ランク: {4}, 提督Exp+{5}, 艦娘Exp+{6} )",
+						Compass.MapAreaID, Compass.MapInfoID, Compass.Destination, Result.EnemyFleetName, Result.Rank, Result.AdmiralExp, Result.BaseExp ) );
 			}
+
 
 
 			//ドロップ艦記録
@@ -193,13 +240,14 @@ namespace ElectronicObserver.Data.Battle {
 
 				//checkme: とてもアレな感じ
 
-				int dropID = Result.DroppedShipID;
+				int shipID = Result.DroppedShipID;
+				int itemID  = Result.DroppedItemID;
+				int eqID = Result.DroppedEquipmentID;
 				bool showLog = Utility.Configuration.Config.Log.ShowSpoiler;
 
-				if ( dropID != -1 ) {
+				if ( shipID != -1 ) {
 
-					ShipDataMaster ship = KCDatabase.Instance.MasterShips[dropID];
-
+					ShipDataMaster ship = KCDatabase.Instance.MasterShips[shipID];
 					DroppedShipCount++;
 
 					var defaultSlot = ship.DefaultSlot;
@@ -210,42 +258,65 @@ namespace ElectronicObserver.Data.Battle {
 						Utility.Logger.Add( 2, string.Format( "{0}「{1}」が戦列に加わりました。", ship.ShipTypeName, ship.NameWithClass ) );
 				}
 
-				if ( dropID == -1 ) {
+				if ( itemID != -1 ) {
 
-					int itemID = Result.DroppedItemID;
+					if ( !DroppedItemCount.ContainsKey( itemID ) )
+						DroppedItemCount.Add( itemID, 0 );
+					DroppedItemCount[itemID]++;
 
-					if ( itemID != -1 ) {
-						dropID = itemID + 1000;
-						if ( showLog )
-							Utility.Logger.Add( 2, string.Format( "アイテム「{0}」を入手しました。", KCDatabase.Instance.MasterUseItems[itemID].Name ) );
+					if ( showLog ) {
+						var item = KCDatabase.Instance.UseItems[itemID];
+						var itemmaster = KCDatabase.Instance.MasterUseItems[itemID];
+						Utility.Logger.Add( 2, string.Format( "アイテム「{0}」を入手しました。( 合計: {1}個 )", itemmaster != null ? itemmaster.Name : ( "不明なアイテム - ID:" + itemID ), ( item != null ? item.Count : 0 ) + DroppedItemCount[itemID] ) );
 					}
 				}
 
-				if ( dropID == -1 ) {
+				if ( eqID != -1 ) {
 
-					int eqID = Result.DroppedEquipmentID;
+					EquipmentDataMaster eq = KCDatabase.Instance.MasterEquipments[eqID];
+					DroppedEquipmentCount++;
 
-					if ( eqID != -1 ) {
-						dropID = eqID + 2000;
-						if ( showLog ) {
-							EquipmentDataMaster eq = KCDatabase.Instance.MasterEquipments[eqID];
-							Utility.Logger.Add( 2, string.Format( "{0}「{1}」を入手しました。", eq.CategoryTypeInstance.Name, eq.Name ) );
-						}
-
-						DroppedEquipmentCount++;
+					if ( showLog ) {
+						Utility.Logger.Add( 2, string.Format( "{0}「{1}」を入手しました。", eq.CategoryTypeInstance.Name, eq.Name ) );
 					}
-
 				}
 
 
-				if ( dropID == -1 && (
+				// 満員判定
+				if ( shipID == -1 && (
 					KCDatabase.Instance.Admiral.MaxShipCount - ( KCDatabase.Instance.Ships.Count + DroppedShipCount ) <= 0 ||
 					KCDatabase.Instance.Admiral.MaxEquipmentCount - ( KCDatabase.Instance.Equipments.Count + DroppedEquipmentCount ) <= 0 ) ) {
-					dropID = -2;
+					shipID = -2;
 				}
 
-				RecordManager.Instance.ShipDrop.Add( dropID, Compass.MapAreaID, Compass.MapInfoID, Compass.Destination, Compass.EventID == 5, Compass.EnemyFleetID, Result.Rank, KCDatabase.Instance.Admiral.Level );
+				RecordManager.Instance.ShipDrop.Add( shipID, itemID, eqID, Compass.MapAreaID, Compass.MapInfoID, Compass.Destination, Compass.MapInfo.EventDifficulty, Compass.EventID == 5, enemyFleetData.FleetID, Result.Rank, KCDatabase.Instance.Admiral.Level );
 			}
+
+
+			//DEBUG
+			/*/
+			if ( Utility.Configuration.Config.Log.LogLevel <= 1 && Utility.Configuration.Config.Connection.SaveReceivedData ) {
+				IEnumerable<int> damages;
+				switch ( BattleMode & BattleModes.BattlePhaseMask ) {
+					case BattleModes.Normal:
+					case BattleModes.AirBattle:
+					case BattleModes.Practice:
+					default:
+						damages = ( (BattleData)BattleNight ?? BattleDay ).AttackDamages;
+						break;
+					case BattleModes.NightOnly:
+					case BattleModes.NightDay:
+						damages = ( (BattleData)BattleDay ?? BattleNight ).AttackDamages;
+						break;
+				}
+
+				damages = damages.Take( 6 ).Where( i => i > 0 );
+
+				if ( damages.Count( i => i == damages.Max() ) > 1 ) {
+					Utility.Logger.Add( 1, "MVP候補が複数存在します。ログを確認してください。" );
+				}
+			}
+			//*/
 
 		}
 

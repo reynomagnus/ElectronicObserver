@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace ElectronicObserver.Observer.kcsapi {
-	
+
 	public class api_start2 : APIBase {
 
 
@@ -47,7 +47,10 @@ namespace ElectronicObserver.Observer.kcsapi {
 				ShipDataMaster ship = db.MasterShips[id];
 				if ( ship != null ) {
 					ship.ResourceName = elem.api_filename;
-					ship.ResourceVersion = elem.api_version;
+					string[] versions = elem.api_version;
+					ship.ResourceGraphicVersion = versions[0];
+					ship.ResourceVoiceVersion = versions[1];
+					ship.ResourcePortVoiceVersion = versions[2];
 				}
 			}
 
@@ -94,6 +97,7 @@ namespace ElectronicObserver.Observer.kcsapi {
 			}
 
 			//api_mst_slotitemgraph
+			/*
 			foreach ( var elem in data.api_mst_slotitemgraph ) {
 
 				int id = (int)elem.api_id;
@@ -102,6 +106,7 @@ namespace ElectronicObserver.Observer.kcsapi {
 					eq.ResourceVersion = elem.api_version;
 				}
 			}
+			*/
 
 			//api_mst_useitem
 			foreach ( var elem in data.api_mst_useitem ) {
@@ -147,13 +152,28 @@ namespace ElectronicObserver.Observer.kcsapi {
 
 
 			//api_mst_shipupgrade
+			Dictionary<int, int> upgradeLevels = new Dictionary<int, int>();
 			foreach ( var elem in data.api_mst_shipupgrade ) {
 
-				if ( elem.api_drawing_count > 0 ) {
-					int id = db.MasterShips[(int)elem.api_id].RemodelBeforeShipID;
-					if ( id != 0 ) {
-						db.MasterShips[id].NeedBlueprint = (int)elem.api_drawing_count;
+				int idbefore = (int)elem.api_current_ship_id;
+				int idafter = (int)elem.api_id;
+				var shipbefore = db.MasterShips[idbefore];
+				var shipafter = db.MasterShips[idafter];
+				int level = (int)elem.api_upgrade_level;
+				
+				if ( upgradeLevels.ContainsKey( idafter ) ) {
+					if ( level < upgradeLevels[idafter] ) {
+						shipafter.RemodelBeforeShipID = idbefore;
+						upgradeLevels[idafter] = level;
 					}
+				} else {
+					shipafter.RemodelBeforeShipID = idbefore;
+					upgradeLevels.Add( idafter, level );
+				}
+
+				if ( shipbefore != null ) {
+					shipbefore.NeedBlueprint = (int)elem.api_drawing_count;
+					shipbefore.NeedCatapult = (int)elem.api_catapult_count;
 				}
 			}
 

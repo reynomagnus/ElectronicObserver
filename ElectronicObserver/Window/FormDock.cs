@@ -31,7 +31,6 @@ namespace ElectronicObserver.Window {
 				ShipName = new Label();
 				ShipName.Text = "???";
 				ShipName.Anchor = AnchorStyles.Left;
-				ShipName.Font = parent.Font;
 				ShipName.ForeColor = parent.ForeColor;
 				ShipName.TextAlign = ContentAlignment.MiddleLeft;
 				ShipName.Padding = new Padding( 0, 1, 0, 1 );
@@ -44,7 +43,6 @@ namespace ElectronicObserver.Window {
 				RepairTime = new Label();
 				RepairTime.Text = "";
 				RepairTime.Anchor = AnchorStyles.Left;
-				RepairTime.Font = parent.Font;
 				RepairTime.ForeColor = parent.ForeColor;
 				RepairTime.Tag = null;
 				RepairTime.TextAlign = ContentAlignment.MiddleLeft;
@@ -53,6 +51,8 @@ namespace ElectronicObserver.Window {
 				RepairTime.MinimumSize = new Size( 60, 10 );
 				RepairTime.AutoSize = true;
 				RepairTime.Visible = true;
+
+				ConfigurationChanged( parent );
 
 				ToolTipInfo = parent.ToolTipInfo;
 
@@ -92,6 +92,7 @@ namespace ElectronicObserver.Window {
 
 				DockData dock = db.Docks[dockID];
 
+				RepairTime.BackColor = Color.Transparent;
 				ToolTipInfo.SetToolTip( ShipName, null );
 				ToolTipInfo.SetToolTip( RepairTime, null );
 
@@ -122,11 +123,24 @@ namespace ElectronicObserver.Window {
 			//タイマー更新時
 			public void Refresh( int dockID ) {
 
-				if ( RepairTime.Tag != null )
-					RepairTime.Text = DateTimeHelper.ToTimeRemainString( (DateTime)RepairTime.Tag );
+				if ( RepairTime.Tag != null ) {
 
+					var time = (DateTime)RepairTime.Tag;
+					
+					RepairTime.Text = DateTimeHelper.ToTimeRemainString( time );
+
+					if ( Utility.Configuration.Config.FormDock.BlinkAtCompletion && ( time - DateTime.Now ).TotalMilliseconds <= Utility.Configuration.Config.NotifierRepair.AccelInterval ) {
+						RepairTime.BackColor = DateTime.Now.Second % 2 == 0 ? Color.LightGreen : Color.Transparent;
+					}
+				}
 			}
 
+
+			public void ConfigurationChanged( FormDock parent ) {
+				ShipName.Font = parent.Font;
+				RepairTime.Font = parent.Font;
+				RepairTime.BackColor = Color.Transparent;
+			}
 		}
 
 
@@ -144,9 +158,7 @@ namespace ElectronicObserver.Window {
 
 			ControlHelper.SetDoubleBuffered( TableDock );
 
-			ConfigurationChanged();
 
-			
 			TableDock.SuspendLayout();
 			ControlDock = new TableDockControl[4];
 			for ( int i = 0; i < ControlDock.Length; i++ ) {
@@ -154,11 +166,14 @@ namespace ElectronicObserver.Window {
 			}
 			TableDock.ResumeLayout();
 
+
+			ConfigurationChanged();
+
 			Icon = ResourceManager.ImageToIcon( ResourceManager.Instance.Icons.Images[(int)ResourceManager.IconContent.FormDock] );
 
 		}
 
-		
+
 		private void FormDock_Load( object sender, EventArgs e ) {
 
 			APIObserver o = APIObserver.Instance;
@@ -172,7 +187,7 @@ namespace ElectronicObserver.Window {
 			Utility.Configuration.Instance.ConfigurationChanged += ConfigurationChanged;
 		}
 
-		
+
 
 		void Updated( string apiname, dynamic data ) {
 
@@ -203,6 +218,11 @@ namespace ElectronicObserver.Window {
 		void ConfigurationChanged() {
 
 			Font = Utility.Configuration.Config.UI.MainFont;
+
+			if ( ControlDock != null ) {
+				foreach ( var c in ControlDock )
+					c.ConfigurationChanged( this );
+			}
 		}
 
 

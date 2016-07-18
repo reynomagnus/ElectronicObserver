@@ -1,5 +1,5 @@
 ﻿using ElectronicObserver.Utility;
-using Fiddler;
+using Nekoxy;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -20,16 +20,31 @@ namespace ElectronicObserver.Observer {
 
 
 		private static readonly HashSet<string> apis = new HashSet<string>() {
-			"/kcsapi/api_port/port"                       ,
-			"/kcsapi/api_get_member/ship2"                ,
-			"/kcsapi/api_get_member/ship3"                ,
-			"/kcsapi/api_get_member/kdock"                ,
-			"/kcsapi/api_req_hensei/change"               ,
-			"/kcsapi/api_req_kousyou/createship"          ,
-			"/kcsapi/api_req_kousyou/getship"             ,
-			"/kcsapi/api_req_kousyou/createitem"          ,
-			"/kcsapi/api_req_sortie/battleresult"         ,
+			"/kcsapi/api_port/port",
+			"/kcsapi/api_get_member/ship2",
+			"/kcsapi/api_get_member/ship3",
+			"/kcsapi/api_get_member/slot_item",
+			"/kcsapi/api_get_member/kdock",
+			"/kcsapi/api_get_member/mapinfo",
+			"/kcsapi/api_req_hensei/change",
+			"/kcsapi/api_req_kousyou/createship",
+			"/kcsapi/api_req_kousyou/getship",
+			"/kcsapi/api_req_kousyou/createitem",
+			"/kcsapi/api_req_map/start",
+			"/kcsapi/api_req_map/next",
+			"/kcsapi/api_req_map/select_eventmap_rank",
+			"/kcsapi/api_req_sortie/battle",
+			"/kcsapi/api_req_battle_midnight/battle",
+			"/kcsapi/api_req_battle_midnight/sp_midnight",
+			"/kcsapi/api_req_sortie/night_to_day",
+			"/kcsapi/api_req_sortie/battleresult",
+			"/kcsapi/api_req_combined_battle/battle",
+			"/kcsapi/api_req_combined_battle/airbattle",
+			"/kcsapi/api_req_combined_battle/midnight_battle",
 			"/kcsapi/api_req_combined_battle/battleresult",
+			"/kcsapi/api_req_sortie/airbattle",
+			"/kcsapi/api_req_combined_battle/battle_water",
+			"/kcsapi/api_req_combined_battle/sp_midnight",
 		};
 
 
@@ -60,29 +75,29 @@ namespace ElectronicObserver.Observer {
 		/// <summary>
 		/// read the after-session, determinate whether it will send to kancolle-db.net
 		/// </summary>
-		public void ExecuteSession( Session oSession ) {
+		public void ExecuteSession( Session session ) {
 
 			if ( string.IsNullOrEmpty( OAuth ) ) {
 				return;
 			}
 
 			// find the url in dict.
-			string url = oSession.PathAndQuery;
+			string url = session.Request.PathAndQuery;
 
 			if ( apis.Contains( url ) ) {
-				PostToServer( oSession );
+				PostToServer( session );
 			}
 
 		}
 
 		private static Regex RequestRegex = new Regex( @"&api(_|%5F)token=[0-9a-f]+|api(_|%5F)token=[0-9a-f]+&?", RegexOptions.Compiled );
 
-		private void PostToServer( Session oSession ) {
+		private void PostToServer( Session session ) {
 
 			string oauth = OAuth;
-			string url = oSession.fullUrl;
-			string request = oSession.GetRequestBodyAsString();
-			string response = oSession.GetResponseBodyAsString();
+			string url = session.Request.PathAndQuery;
+			string request = session.Request.BodyAsString;
+			string response = session.Response.BodyAsString;
 
 			request = RequestRegex.Replace( request, "" );
 
@@ -111,10 +126,10 @@ namespace ElectronicObserver.Observer {
 							// 結構頻繁に出るのでレポートは残さない方針で　申し訳ないです
 							//Utility.ErrorReporter.SendErrorReport( e.Error, string.Format( "艦これ統計データベースへの {0} の送信に失敗しました。", url.Substring( url.IndexOf( "/api" ) + 1 ) ) );
 
-							Utility.Logger.Add( 3, string.Format( "艦これ統計データベースへの {0} の送信に失敗しました。{1}", url.Substring( url.IndexOf( "/api" ) + 1 ), e.Error.Message ) );
+							Utility.Logger.Add( 1, string.Format( "艦これ統計データベースへの {0} の送信に失敗しました。{1}", url.Substring( url.IndexOf( "/api" ) + 1 ), e.Error.Message ) );
 
 						} else {
-							Utility.Logger.Add( 1, string.Format( "艦これ統計データベースへ {0} を送信しました。", url.Substring( url.IndexOf( "/api" ) + 1 ) ) );
+							Utility.Logger.Add( 0, string.Format( "艦これ統計データベースへ {0} を送信しました。", url.Substring( url.IndexOf( "/api" ) + 1 ) ) );
 						}
 					};
 

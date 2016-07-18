@@ -19,12 +19,15 @@ namespace ElectronicObserver.Data {
 		/// </summary>
 		public int CombinedFlag { get; internal set; }
 
-		public DateTime AnchorageRepairingTimer { get; set; }
+		/// <summary>
+		/// 泊地修理タイマ
+		/// </summary>
+		public DateTime AnchorageRepairingTimer { get; private set; }
 
 
 		public FleetManager() {
 			Fleets = new IDDictionary<FleetData>();
-			AnchorageRepairingTimer = DateTime.MinValue;
+			AnchorageRepairingTimer = DateTime.Now;
 		}
 
 
@@ -50,6 +53,20 @@ namespace ElectronicObserver.Data {
 					}
 					break;
 
+				case "api_req_hensei/preset_select": {
+						int id = (int)data.api_id;
+
+						if ( !Fleets.ContainsKey( id ) ) {
+							var a = new FleetData();
+							a.LoadFromResponse( apiname, data );
+							Fleets.Add( a );
+
+						} else {
+							Fleets[id].LoadFromResponse( apiname, data );
+						}
+
+					} break;
+
 				default:
 					base.LoadFromResponse( apiname, (object)data );
 
@@ -70,13 +87,14 @@ namespace ElectronicObserver.Data {
 					break;
 			}
 
-			//泊地修理関連
-			if ( apiname == "api_port/port" ) {
-				if ( ( DateTime.Now - AnchorageRepairingTimer ).TotalMinutes >= 20 || AnchorageRepairingTimer == DateTime.MinValue ) {
-					ResetAnchorageRepairing();
-				}
-			}
 
+			// 泊地修理の処理
+			if ( apiname == "api_port/port" ) {
+
+				if ( ( DateTime.Now - AnchorageRepairingTimer ).TotalMinutes >= 20 )
+					StartAnchorageRepairingTimer();
+
+			}
 		}
 
 
@@ -96,12 +114,16 @@ namespace ElectronicObserver.Data {
 					} break;
 
 				case "api_req_map/start": {
-					int fleetID = int.Parse( data["api_deck_id"] );
+						int fleetID = int.Parse( data["api_deck_id"] );
 						if ( CombinedFlag != 0 && fleetID == 1 ) {
 							Fleets[2].IsInSortie = true;
 						}
 						Fleets[fleetID].IsInSortie = true;
 					} goto default;
+
+				case "api_req_hensei/combined":
+					CombinedFlag = int.Parse( data["api_combined_type"] );
+					break;
 
 				default:
 					foreach ( int i in Fleets.Keys )
@@ -112,17 +134,13 @@ namespace ElectronicObserver.Data {
 
 		}
 
-		public void ResetAnchorageRepairing() {
+
+		/// <summary>
+		/// 泊地修理タイマを現在時刻にセットします。
+		/// </summary>
+		public void StartAnchorageRepairingTimer() {
 			AnchorageRepairingTimer = DateTime.Now;
 		}
-
-
-		public void StartAnchorageRepairing() {
-			if ( Fleets.Values.Count( f => f.IsAnchorageRepairing ) == 1 ) {
-				ResetAnchorageRepairing();
-			}
-		}
-
 
 	}
 

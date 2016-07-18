@@ -1,4 +1,5 @@
 ﻿using ElectronicObserver.Data;
+using ElectronicObserver.Utility.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,6 +30,9 @@ namespace ElectronicObserver.Resource.Record {
 		public DevelopmentRecord Development { get; private set; }
 		public ResourceRecord Resource { get; private set; }
 
+
+		private DateTime _prevTime;
+
 		private RecordManager() {
 
 			MasterPath = @"Record";
@@ -42,46 +46,88 @@ namespace ElectronicObserver.Resource.Record {
 			if ( !Directory.Exists( MasterPath ) ) {
 				Directory.CreateDirectory( MasterPath );
 			}
+
+			_prevTime = DateTime.Now;
+			Observer.APIObserver.Instance["api_port/port"].ResponseReceived += TimerSave;
+		}
+
+		public bool Load( bool logging = true ) {
+
+			bool succeeded = true;
+
+			ResourceManager.CopyFromArchive( "Record/" + ShipParameter.FileName, MasterPath + "\\" + ShipParameter.FileName );
+
+			succeeded &= EnemyFleet.Load( MasterPath );
+			succeeded &= ShipParameter.Load( MasterPath );
+			succeeded &= Construction.Load( MasterPath );
+			succeeded &= ShipDrop.Load( MasterPath );
+			succeeded &= Development.Load( MasterPath );
+			succeeded &= Resource.Load( MasterPath );
+
+			if ( logging ) {
+				if ( succeeded )
+					Utility.Logger.Add( 2, "レコードをロードしました。" );
+				else
+					Utility.Logger.Add( 3, "レコードのロードに失敗しました。" );
+			}
+
+			return succeeded;
 		}
 
 
-		public void Load() {
-
-			bool successed = true;
-
-			successed &= EnemyFleet.Load( MasterPath );
-			successed &= ShipParameter.Load( MasterPath );
-			successed &= Construction.Load( MasterPath );
-			successed &= ShipDrop.Load( MasterPath );
-			successed &= Development.Load( MasterPath );
-			successed &= Resource.Load( MasterPath );
-
-			if ( successed )
-				Utility.Logger.Add( 2, "レコードをロードしました。" );
-			else
-				Utility.Logger.Add( 3, "レコードのロードに失敗しました。" );
-		}
-
-		public void Save() {
+		public bool Save( bool logging = true ) {
 
 			//api_start2がロード済みのときのみ
-			if ( KCDatabase.Instance.MasterShips.Count == 0 ) return;
+			if ( KCDatabase.Instance.MasterShips.Count == 0 ) return false;
 
-			bool successed = true;
+			bool succeeded = true;
 
 
-			successed &= EnemyFleet.Save( MasterPath );
-			successed &= ShipParameter.Save( MasterPath );
-			successed &= Construction.Save( MasterPath );
-			successed &= ShipDrop.Save( MasterPath );
-			successed &= Development.Save( MasterPath );
-			successed &= Resource.Save( MasterPath );
+			succeeded &= EnemyFleet.Save( MasterPath );
+			succeeded &= ShipParameter.Save( MasterPath );
+			succeeded &= Construction.Save( MasterPath );
+			succeeded &= ShipDrop.Save( MasterPath );
+			succeeded &= Development.Save( MasterPath );
+			succeeded &= Resource.Save( MasterPath );
 
-			if ( successed )
-				Utility.Logger.Add( 2, "レコードをセーブしました。" );
-			else
-				Utility.Logger.Add( 2, "レコードのセーブに失敗しました。" );
+			if ( logging ) {
+				if ( succeeded )
+					Utility.Logger.Add( 2, "レコードをセーブしました。" );
+				else
+					Utility.Logger.Add( 2, "レコードのセーブに失敗しました。" );
+			}
 
+			return succeeded;
+		}
+
+
+		void TimerSave( string apiname, dynamic data ) {
+
+			bool iscleared;
+
+			switch ( Utility.Configuration.Config.Control.RecordAutoSaving ) {
+				case 0:
+				default:
+					iscleared = false;
+					break;
+				case 1:
+					iscleared = DateTimeHelper.IsCrossedHour( _prevTime );
+					break;
+				case 2:
+					iscleared = DateTimeHelper.IsCrossedDay( _prevTime, 0, 0, 0  );
+					break;
+			}
+
+
+			if ( iscleared ) {
+				_prevTime = DateTime.Now;
+
+				if ( Save( false ) ) {
+					Utility.Logger.Add( 1, "レコードのオートセーブを行いました。" );
+				} else {
+					Utility.Logger.Add( 3, "レコードのオートセーブに失敗しました。" );
+				}
+			}
 		}
 
 	}

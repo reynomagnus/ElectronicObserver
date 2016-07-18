@@ -1,5 +1,6 @@
 ﻿using BrowserLib;
 using mshtml;
+using Nekoxy;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -73,6 +74,12 @@ namespace Browser {
 		private VolumeManager _volumeManager;
 
 
+		private NumericUpDown ToolMenu_Other_Volume_VolumeControl {
+			get { return (NumericUpDown)( (ToolStripControlHost)ToolMenu_Other_Volume.DropDownItems["ToolMenu_Other_Volume_VolumeControlHost"] ).Control; }
+		}
+
+
+
 
 		/// <summary>
 		/// </summary>
@@ -84,6 +91,26 @@ namespace Browser {
 			StyleSheetApplied = false;
 			_volumeManager = new VolumeManager( (uint)System.Diagnostics.Process.GetCurrentProcess().Id );
 			Browser.ReplacedKeyDown += Browser_ReplacedKeyDown;
+
+			// 音量設定用コントロールの追加
+			{
+				var control = new NumericUpDown();
+				control.Name = "ToolMenu_Other_Volume_VolumeControl";
+				control.Maximum = 100;
+				control.TextAlign = HorizontalAlignment.Right;
+				control.Font = ToolMenu_Other_Volume.Font;
+
+				control.ValueChanged += ToolMenu_Other_Volume_ValueChanged;
+				control.Tag = false;
+
+				var host = new ToolStripControlHost( control, "ToolMenu_Other_Volume_VolumeControlHost" );
+
+				control.Size = new Size( host.Width - control.Margin.Horizontal, host.Height - control.Margin.Vertical );
+				control.Location = new Point( control.Margin.Left, control.Margin.Top );
+
+
+				ToolMenu_Other_Volume.DropDownItems.Add( host );
+			}
 		}
 
 
@@ -163,7 +190,7 @@ namespace Browser {
 			ApplyZoom();
 
 			//起動直後はまだ音声が鳴っていないのでミュートできないため、この時点で有効化
-			SetMuteIcon();
+			SetVolumeState();
 		}
 
 
@@ -201,7 +228,11 @@ namespace Browser {
 
 		private void Browser_Navigating( object sender, WebBrowserNavigatingEventArgs e ) {
 
-			IsKanColleLoaded = false;
+			// note: ここを有効にすると別ページに切り替えた際にきちんとセーフティが働くが、代わりにまれに誤検知して撮影できなくなる時がある
+			// 無効にするとセーフティは働かなくなるが誤検知がなくなる
+			// セーフティを切ってでも誤検知しなくしたほうがいいので無効化
+
+			//IsKanColleLoaded = false;
 
 		}
 
@@ -226,7 +257,7 @@ namespace Browser {
 				var document = Browser.Document;
 				if ( document == null ) return;
 
-				if ( document.Url.AbsolutePath.Contains( ".swf?" ) ) {
+				if ( document.Url.ToString().Contains( ".swf?" ) ) {
 
 					document.Body.SetAttribute( "width", "100%" );
 					document.Body.SetAttribute( "height", "100%" );
@@ -393,6 +424,7 @@ namespace Browser {
 
 			if ( !IsKanColleLoaded ) {
 				AddLog( 3, string.Format( "艦これが読み込まれていないため、スクリーンショットを撮ることはできません。" ) );
+				System.Media.SystemSounds.Beep.Play();
 				return;
 			}
 
@@ -400,7 +432,7 @@ namespace Browser {
 				IViewObject viewobj = null;
 				//int width = 0, height = 0;
 
-				if ( wb.Document.Url.AbsolutePath.Contains( ".swf?" ) ) {
+				if ( wb.Document.Url.ToString().Contains( ".swf?" ) ) {
 
 					viewobj = wb.Document.GetElementsByTagName( "embed" )[0].DomElement as IViewObject;
 					if ( viewobj == null ) {
@@ -458,14 +490,23 @@ namespace Browser {
 
 				BrowserHost.AsyncRemoteRun( () =>
 					BrowserHost.Proxy.SendErrorReport( ex.ToString(), "スクリーンショットの保存時にエラーが発生しました。" ) );
+				System.Media.SystemSounds.Beep.Play();
+
 			}
 
 
 		}
 
 
-		public void SetProxy( string address, int port ) {
-			Fiddler.URLMonInterop.SetProxyInProcess( string.Format( "{0}:{1}", address, port ), "<local>" );
+		public void SetProxy( string proxy ) {
+			ushort port;
+			if ( ushort.TryParse( proxy, out port ) ) {
+				WinInetUtil.SetProxyInProcessForNekoxy( port );
+			} else {
+				WinInetUtil.SetProxyInProcess( proxy, "local" );
+			}
+
+			//AddLog( 1, "setproxy:" + proxy );
 		}
 
 
@@ -585,31 +626,39 @@ namespace Browser {
 				Icons.Images["Browser_Navigate"];
 			ToolMenu_Other.Image =
 				Icons.Images["Browser_Other"];
-			SetMuteIcon();
+
+			SetVolumeState();
 		}
 
 
-		private void SetMuteIcon() {
+		private void SetVolumeState() {
 
 			bool mute;
-			bool isEnabled;
+			float volume;
 
 			try {
 				mute = _volumeManager.IsMute;
-				isEnabled = true;
+				volume = _volumeManager.Volume * 100;
 
 			} catch ( Exception ) {
 				// 音量データ取得不能時
 				mute = false;
-				isEnabled = false;
+				volume = 100;
 			}
 
 			ToolMenu_Mute.Image = ToolMenu_Other_Mute.Image =
 				Icons.Images[mute ? "Browser_Mute" : "Browser_Unmute"];
 
+			{
+				var control = ToolMenu_Other_Volume_VolumeControl;
+				control.Tag = false;
+				control.Value = (decimal)volume;
+				control.Tag = true;
+			}
 
-			ToolMenu_Mute.Enabled = ToolMenu_Other_Mute.Enabled =
-				isEnabled;
+			Configuration.Volume = volume;
+			Configuration.IsMute = mute;
+			ConfigurationUpdated();
 		}
 
 
@@ -687,10 +736,28 @@ namespace Browser {
 				_volumeManager.ToggleMute();
 
 			} catch ( Exception ) {
+				System.Media.SystemSounds.Beep.Play();
 			}
 
-			SetMuteIcon();
+			SetVolumeState();
 		}
+
+		void ToolMenu_Other_Volume_ValueChanged( object sender, EventArgs e ) {
+
+			var control = ToolMenu_Other_Volume_VolumeControl;
+
+			try {
+				if ( (bool)control.Tag )
+					_volumeManager.Volume = (float)( control.Value / 100 );
+				control.BackColor = SystemColors.Window;
+
+			} catch ( Exception ) {
+				control.BackColor = Color.MistyRose;
+
+			}
+
+		}
+
 
 		private void ToolMenu_Other_Refresh_Click( object sender, EventArgs e ) {
 
@@ -720,6 +787,9 @@ namespace Browser {
 
 		private void ToolMenu_Other_AppliesStyleSheet_Click( object sender, EventArgs e ) {
 			Configuration.AppliesStyleSheet = ToolMenu_Other_AppliesStyleSheet.Checked;
+			if ( Configuration.AppliesStyleSheet ) {
+				ApplyStyleSheet();
+			}
 			ConfigurationUpdated();
 		}
 
@@ -762,7 +832,7 @@ namespace Browser {
 
 
 
-		private void SizeAdjuster_Click( object sender, EventArgs e ) {
+		private void SizeAdjuster_DoubleClick( object sender, EventArgs e ) {
 			ToolMenu.Visible =
 			Configuration.IsToolMenuVisible = true;
 			ConfigurationUpdated();

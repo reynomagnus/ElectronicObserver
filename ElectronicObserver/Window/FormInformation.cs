@@ -18,11 +18,13 @@ namespace ElectronicObserver.Window {
 	public partial class FormInformation : DockContent {
 
 		private int _ignorePort;
+		private List<int> _inSortie;
 
 		public FormInformation( FormMain parent ) {
 			InitializeComponent();
 
 			_ignorePort = 0;
+			_inSortie = null;
 
 			ConfigurationChanged();
 
@@ -34,13 +36,18 @@ namespace ElectronicObserver.Window {
 
 			APIObserver o = APIObserver.Instance;
 
-			o.APIList["api_port/port"].ResponseReceived += Updated;
-			o.APIList["api_req_member/get_practice_enemyinfo"].ResponseReceived += Updated;
-			o.APIList["api_get_member/picture_book"].ResponseReceived += Updated;
-			o.APIList["api_req_kousyou/createitem"].ResponseReceived += Updated;
-			o.APIList["api_get_member/mapinfo"].ResponseReceived += Updated;
-			o.APIList["api_req_mission/result"].ResponseReceived += Updated;
-			o.APIList["api_req_ranking/getlist"].ResponseReceived += Updated;
+			o["api_port/port"].ResponseReceived += Updated;
+			o["api_req_member/get_practice_enemyinfo"].ResponseReceived += Updated;
+			o["api_get_member/picture_book"].ResponseReceived += Updated;
+			o["api_req_kousyou/createitem"].ResponseReceived += Updated;
+			o["api_get_member/mapinfo"].ResponseReceived += Updated;
+			o["api_req_mission/result"].ResponseReceived += Updated;
+			o["api_req_practice/battle_result"].ResponseReceived += Updated;
+			o["api_req_sortie/battleresult"].ResponseReceived += Updated;
+			o["api_req_combined_battle/battleresult"].ResponseReceived += Updated;
+			o["api_req_hokyu/charge"].ResponseReceived += Updated;
+			o["api_req_map/start"].ResponseReceived += Updated;
+			o["api_req_practice/battle"].ResponseReceived += Updated;
 
 			Utility.Configuration.Instance.ConfigurationChanged += ConfigurationChanged;
 		}
@@ -61,6 +68,11 @@ namespace ElectronicObserver.Window {
 						_ignorePort--;
 					else
 						TextInformation.Text = "";		//とりあえずクリア
+
+					if ( _inSortie != null ) {
+						TextInformation.Text = GetConsumptionResource( data );
+					}
+					_inSortie = null;
 					break;
 
 				case "api_req_member/get_practice_enemyinfo":
@@ -84,10 +96,23 @@ namespace ElectronicObserver.Window {
 					_ignorePort = 1;
 					break;
 
-				case "api_req_ranking/getlist":
-					TextInformation.Text = GetRankingData( data );
+				case "api_req_practice/battle_result":
+				case "api_req_sortie/battleresult":
+				case "api_req_combined_battle/battleresult":
+					TextInformation.Text = GetBattleResult( data );
 					break;
 
+				case "api_req_hokyu/charge":
+					TextInformation.Text = GetSupplyInformation( data );
+					break;
+
+				case "api_req_map/start":
+					_inSortie = KCDatabase.Instance.Fleet.Fleets.Values.Where( f => f.IsInSortie || f.ExpeditionState == 1 ).Select( f => f.FleetID ).ToList();
+					break;
+
+				case "api_req_practice/battle":
+					_inSortie = new List<int>() { KCDatabase.Instance.Battle.BattleDay.Initial.FriendFleetID };
+					break;
 			}
 
 		}
@@ -97,19 +122,82 @@ namespace ElectronicObserver.Window {
 
 			StringBuilder sb = new StringBuilder();
 			sb.AppendLine( "[演習情報]" );
+			sb.AppendLine( "敵提督名 : " + data.api_nickname );
 			sb.AppendLine( "敵艦隊名 : " + data.api_deckname );
 
 			{
 				int ship1lv = (int)data.api_deck.api_ships[0].api_id != -1 ? (int)data.api_deck.api_ships[0].api_level : 1;
 				int ship2lv = (int)data.api_deck.api_ships[1].api_id != -1 ? (int)data.api_deck.api_ships[1].api_level : 1;
 
+				// 経験値テーブルが拡張されたとき用の対策
+				ship1lv = Math.Min( ship1lv, ExpTable.ShipExp.Keys.Max() );
+				ship2lv = Math.Min( ship2lv, ExpTable.ShipExp.Keys.Max() );
+
 				double expbase = ExpTable.ShipExp[ship1lv].Total / 100.0 + ExpTable.ShipExp[ship2lv].Total / 300.0;
 				if ( expbase >= 500.0 )
 					expbase = 500.0 + Math.Sqrt( expbase - 500.0 );
 
-				sb.AppendLine( "獲得経験値 : " + (int)expbase );
-				sb.AppendLine( "S勝利 : " + (int)( expbase * 1.2 ) );
+				expbase = (int)expbase;
 
+				sb.AppendFormat( "獲得経験値: {0} / S勝利: {1}\r\n", expbase, (int)( expbase * 1.2 ) );
+
+
+				// 練巡ボーナス計算 - きたない
+				var fleet = KCDatabase.Instance.Fleet[1];
+				if ( fleet.MembersInstance.Any( s => s != null && s.MasterShip.ShipType == 21 ) ) {
+					var members = fleet.MembersInstance;
+					var subCT = members.Skip( 1 ).Where( s => s != null && s.MasterShip.ShipType == 21 );
+
+					double bonus;
+
+					// 旗艦が練巡
+					if ( members[0] != null && members[0].MasterShip.ShipType == 21 ) {
+
+						int level = members[0].Level;
+
+						if ( subCT != null && subCT.Any() ) {
+							// 旗艦+随伴
+							if ( level < 10 ) bonus = 1.10;
+							else if ( level < 30 ) bonus = 1.13;
+							else if ( level < 60 ) bonus = 1.16;
+							else if ( level < 100 ) bonus = 1.20;
+							else bonus = 1.25;
+
+						} else {
+							// 旗艦のみ
+							if ( level < 10 ) bonus = 1.05;
+							else if ( level < 30 ) bonus = 1.08;
+							else if ( level < 60 ) bonus = 1.12;
+							else if ( level < 100 ) bonus = 1.15;
+							else bonus = 1.20;
+						}
+
+					} else {
+
+						int level = subCT.Max( s => s.Level );
+
+						if ( subCT.Count() > 1 ) {
+							// 随伴複数	
+							if ( level < 10 ) bonus = 1.04;
+							else if ( level < 30 ) bonus = 1.06;
+							else if ( level < 60 ) bonus = 1.08;
+							else if ( level < 100 ) bonus = 1.12;
+							else bonus = 1.175;
+
+						} else {
+							// 随伴単艦
+							if ( level < 10 ) bonus = 1.03;
+							else if ( level < 30 ) bonus = 1.05;
+							else if ( level < 60 ) bonus = 1.07;
+							else if ( level < 100 ) bonus = 1.10;
+							else bonus = 1.15;
+						}
+					}
+
+					sb.AppendFormat( "(練巡強化: {0} / S勝利: {1})\r\n", (int)( expbase * bonus ), (int)( (int)( expbase * 1.2 ) * bonus ) );
+
+
+				}
 			}
 
 			return sb.ToString();
@@ -137,7 +225,10 @@ namespace ElectronicObserver.Window {
 						dynamic[] state = elem.api_state;
 						for ( int i = 0; i < state.Length; i++ ) {
 							if ( (int)state[i][1] == 0 ) {
-								sb.AppendLine( KCDatabase.Instance.MasterShips[(int)elem.api_table_id[i]].Name );
+
+								var target = KCDatabase.Instance.MasterShips[(int)elem.api_table_id[i]];
+								if ( target != null )		//季節の衣替え艦娘の場合存在しないことがある
+									sb.AppendLine( target.Name );
 							}
 						}
 
@@ -155,7 +246,7 @@ namespace ElectronicObserver.Window {
 
 				} else {
 					//装備図鑑
-					const int bound = 50;		// 図鑑1ページあたりの装備数
+					const int bound = 70;		// 図鑑1ページあたりの装備数
 					int startIndex = ( ( (int)data.api_list[0].api_index_no - 1 ) / bound ) * bound + 1;
 					bool[] flags = Enumerable.Repeat<bool>( false, bound ).ToArray();
 
@@ -217,7 +308,15 @@ namespace ElectronicObserver.Window {
 
 					} else if ( elem.api_eventmap() ) {
 
-						sb.AppendFormat( "{0}-{1} : HP {2}/{3}\r\n", map.MapAreaID, map.MapInfoID, (int)elem.api_eventmap.api_now_maphp, (int)elem.api_eventmap.api_max_maphp );
+						string difficulty = "";
+						if ( elem.api_eventmap.api_selected_rank() ) {
+							difficulty = "[" + Constants.GetDifficulty( (int)elem.api_eventmap.api_selected_rank ) + "] ";
+						}
+
+						sb.AppendFormat( "{0}-{1} {2}: {3} {4}/{5}\r\n",
+							map.MapAreaID, map.MapInfoID, difficulty,
+							elem.api_eventmap.api_gauge_type() && (int)elem.api_eventmap.api_gauge_type == 3 ? "TP" : "HP",
+							(int)elem.api_eventmap.api_now_maphp, (int)elem.api_eventmap.api_max_maphp );
 
 					}
 				}
@@ -240,24 +339,59 @@ namespace ElectronicObserver.Window {
 		}
 
 
-		private string GetRankingData( dynamic data ) {
-
+		private string GetBattleResult( dynamic data ) {
 			StringBuilder sb = new StringBuilder();
 
-			foreach ( dynamic elem in data.api_list ) {
-
-				sb.AppendFormat( "{0}: {1} {2} Lv. {3} / {4} exp.\r\n",
-					(int)elem.api_no,
-					elem.api_nickname,
-					Constants.GetAdmiralRank( (int)elem.api_rank ),
-					(int)elem.api_level,
-					(int)elem.api_experience
-					);
-
-			}
+			sb.AppendLine( "[戦闘終了]" );
+			sb.AppendFormat( "敵艦隊名: {0}\r\n", data.api_enemy_info.api_deck_name );
+			sb.AppendFormat( "勝敗判定: {0}\r\n", data.api_win_rank );
+			sb.AppendFormat( "提督経験値: +{0}\r\n", (int)data.api_get_exp );
 
 			return sb.ToString();
 		}
+
+
+		private string GetSupplyInformation( dynamic data ) {
+
+			StringBuilder sb = new StringBuilder();
+
+			sb.AppendLine( "[補給完了]" );
+			sb.AppendFormat( "ボーキサイト: {0} ( {1}機 )\r\n", (int)data.api_use_bou, (int)data.api_use_bou / 5 );
+
+			return sb.ToString();
+		}
+
+
+		private string GetConsumptionResource( dynamic data ) {
+
+			StringBuilder sb = new StringBuilder();
+			int fuel_supply = 0,
+				fuel_repair = 0,
+				ammo = 0,
+				steel = 0,
+				bauxite = 0;
+
+
+			sb.AppendLine( "[艦隊帰投]" );
+
+			foreach ( var f in KCDatabase.Instance.Fleet.Fleets.Values.Where( f => _inSortie.Contains( f.FleetID ) ) ) {
+
+				fuel_supply += f.MembersInstance.Sum( s => s == null ? 0 : (int)Math.Floor( ( s.FuelMax - s.Fuel ) * ( s.IsMarried ? 0.85 : 1.0 ) ) );
+				ammo += f.MembersInstance.Sum( s => s == null ? 0 : (int)Math.Floor( ( s.AmmoMax - s.Ammo ) * ( s.IsMarried ? 0.85 : 1.0 ) ) );
+				bauxite += f.MembersInstance.Sum( s => s == null ? 0 : s.Aircraft.Zip( s.MasterShip.Aircraft, ( current, max ) => new { Current = current, Max = max } ).Sum( a => ( a.Max - a.Current ) * 5 ) );
+
+				fuel_repair += f.MembersInstance.Sum( s => s == null ? 0 : s.RepairFuel );
+				steel += f.MembersInstance.Sum( s => s == null ? 0 : s.RepairSteel );
+
+			}
+
+			sb.AppendFormat( "燃料: {0} (補給) + {1} (入渠) = {2}\r\n弾薬: {3}\r\n鋼材: {4}\r\nボーキ: {5} ( {6}機 )\r\n",
+				fuel_supply, fuel_repair, fuel_supply + fuel_repair, ammo, steel, bauxite, bauxite / 5 );
+
+			return sb.ToString();
+		}
+
+
 
 
 		protected override string GetPersistString() {
