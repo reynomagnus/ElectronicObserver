@@ -113,9 +113,16 @@ namespace ElectronicObserver.Data {
 
 
 
+
+		/// <summary>
+		/// 疲労度回復処理用タイマ
+		/// </summary>
 		public DateTime? ConditionTime { get; internal set; }
+
+		/// <summary>
+		/// 疲労回復タイマがロック中かどうか
+		/// </summary>
 		public bool IsConditionTimeLocked { get; internal set; }
-		public bool IsAnchorageRepairing { get; internal set; }
 
 
 		public int ID {
@@ -153,7 +160,6 @@ namespace ElectronicObserver.Data {
 
 					UnlockConditionTimer();
 					ShortenConditionTimer();
-					UpdateAnchorageRepairingState();
 					break;
 
 				case "api_get_member/ndock":
@@ -161,7 +167,6 @@ namespace ElectronicObserver.Data {
 				case "api_get_member/ship3":
 				case "api_req_kaisou/powerup":
 					ShortenConditionTimer();
-					UpdateAnchorageRepairingState();
 					break;
 
 				default:	//checkme
@@ -204,6 +209,13 @@ namespace ElectronicObserver.Data {
 							} else {
 								//入隊
 
+								for ( int y = index - 1; y >= 0; y-- ) {		// 変更位置よりも前に空欄があれば位置をずらす
+									if ( _members[y] != -1 ) {
+										index = y + 1;
+										break;
+									}
+								}
+
 								_members[index] = shipID;
 
 								//入れ替え
@@ -219,11 +231,12 @@ namespace ElectronicObserver.Data {
 									}
 								}
 
-
 							}
 
 
 							SetConditionTimer();
+							if ( index != -1 && CanAnchorageRepairing )		//随伴艦一括解除を除く
+								KCDatabase.Instance.Fleet.StartAnchorageRepairingTimer();
 
 						} else {
 
@@ -237,6 +250,9 @@ namespace ElectronicObserver.Data {
 										else
 											RemoveShip( i );
 
+										if ( CanAnchorageRepairing )
+											KCDatabase.Instance.Fleet.StartAnchorageRepairingTimer();
+
 										break;
 									}
 								}
@@ -245,10 +261,6 @@ namespace ElectronicObserver.Data {
 
 						}
 
-						UpdateAnchorageRepairingState();
-						if ( flagshipID != _members[0] && MembersInstance[0] != null && MembersInstance[0].MasterShip.ShipType == 19 ) {
-							KCDatabase.Instance.Fleet.ResetAnchorageRepairing();
-						}
 
 					} break;
 
@@ -259,11 +271,11 @@ namespace ElectronicObserver.Data {
 						for ( int i = 0; i < _members.Length; i++ ) {
 							if ( _members[i] == shipID ) {
 								RemoveShip( i );
+
 								ShortenConditionTimer();
 								break;
 							}
 						}
-						UpdateAnchorageRepairingState();
 
 					} break;
 
@@ -272,25 +284,23 @@ namespace ElectronicObserver.Data {
 							for ( int i = 0; i < _members.Length; i++ ) {
 								if ( _members[i] == id ) {
 									RemoveShip( i );
+
 									ShortenConditionTimer();
 									break;
 								}
 							}
 						}
-						UpdateAnchorageRepairingState();
 					} break;
 
 				case "api_req_kaisou/remodeling":	//fixme: ここでリセットしてもまだデータが送られてきてないので無意味
 					if ( Members.Contains( int.Parse( data["api_id"] ) ) ) {
 						SetConditionTimer();
-						UpdateAnchorageRepairingState();
 					}
 					break;
 
 				case "api_req_nyukyo/start":
 				case "api_req_nyukyo/speedchange":
 					ShortenConditionTimer();
-					UpdateAnchorageRepairingState();
 					break;
 
 				case "api_req_mission/start":
@@ -314,6 +324,10 @@ namespace ElectronicObserver.Data {
 		}
 
 
+		/// <summary>
+		/// 指定した艦娘を艦隊からはずします。
+		/// </summary>
+		/// <param name="index">対象艦のインデックス。0-5</param>
 		private void RemoveShip( int index ) {
 
 			for ( int i = index + 1; i < _members.Length; i++ )
@@ -324,11 +338,19 @@ namespace ElectronicObserver.Data {
 		}
 
 
+		/// <summary>
+		/// 疲労回復にかかる時間を取得します。
+		/// </summary>
+		/// <param name="cond">コンディション。</param>
 		private int GetConditionRecoveryMinute( int cond ) {
 			return Math.Max( (int)Math.Ceiling( ( Utility.Configuration.Config.Control.ConditionBorder - cond ) / 3.0 ) * 3, 0 );
 		}
 
 		//*/
+		/// <summary>
+		/// 疲労回復タイマを設定します。
+		/// 現在のタイマにかかわらず設定します。
+		/// </summary>
 		private void SetConditionTimer() {
 
 			int minute = GetConditionRecoveryMinute( MembersInstance.Min( s => s != null ? s.Condition : 100 ) );
@@ -361,6 +383,10 @@ namespace ElectronicObserver.Data {
 		}
 		//*/
 
+		/// <summary>
+		/// 疲労回復タイマを更新します。
+		/// 現在時間より短くなるように設定します。
+		/// </summary>
 		private void ShortenConditionTimer() {
 
 			int minute = GetConditionRecoveryMinute( MembersInstance.Min( s => s != null ? s.Condition : 100 ) );
@@ -389,10 +415,17 @@ namespace ElectronicObserver.Data {
 			//*/
 		}
 
+
+		/// <summary>
+		/// 疲労回復タイマをロックします。
+		/// </summary>
 		private void LockConditionTimer() {
 			IsConditionTimeLocked = true;
 		}
 
+		/// <summary>
+		/// 疲労回復タイマのロックを解除します。
+		/// </summary>
 		private void UnlockConditionTimer() {
 			if ( IsConditionTimeLocked ) {
 				IsConditionTimeLocked = false;
@@ -400,6 +433,7 @@ namespace ElectronicObserver.Data {
 				SetConditionTimer();
 			}
 		}
+
 
 		/// <summary>
 		/// 護衛退避を実行します。
@@ -434,6 +468,9 @@ namespace ElectronicObserver.Data {
 
 				case 2:
 					return Calculator.GetSearchingAbility_TinyAutumn( this );
+
+				case 3:
+					return Calculator.GetSearchingAbility_33( this );
 			}
 		}
 
@@ -447,7 +484,7 @@ namespace ElectronicObserver.Data {
 		/// <summary>
 		/// 指定の計算式で、索敵能力を表す文字列を取得します。
 		/// </summary>
-		/// <param name="index">計算式。0-2</param>
+		/// <param name="index">計算式。0-3</param>
 		public string GetSearchingAbilityString( int index ) {
 			switch ( index ) {
 				default:
@@ -459,9 +496,23 @@ namespace ElectronicObserver.Data {
 
 				case 2:
 					return Calculator.GetSearchingAbility_TinyAutumn( this ).ToString();
+
+				case 3:
+					return ( (int)( Calculator.GetSearchingAbility_33( this ) * 100 ) / 100 ).ToString( "F2" );
 			}
 		}
 
+		/// <summary>
+		/// 触接開始率を取得します。
+		/// </summary>
+		/// <returns></returns>
+		public double GetContactProbability() {
+			return Calculator.GetContactProbability( this );
+		}
+
+		public Dictionary<int, double> GetContactSelectionProbability() {
+			return Calculator.GetContactSelectionProbability( this );
+		}
 
 
 		/// <summary>
@@ -525,7 +576,7 @@ namespace ElectronicObserver.Data {
 					label.Text = "入渠中 " + DateTimeHelper.ToTimeRemainString( timer );
 					label.ImageIndex = (int)ResourceManager.IconContent.FleetDocking;
 
-					tooltip.SetToolTip( label, "完了日時 : " + timer );
+					tooltip.SetToolTip( label, "完了日時 : " + DateTimeHelper.TimeToCSVString( timer ) );
 
 					return FleetStates.Docking;
 				}
@@ -563,7 +614,10 @@ namespace ElectronicObserver.Data {
 				label.Text = "遠征中 " + DateTimeHelper.ToTimeRemainString( timer );
 				label.ImageIndex = (int)ResourceManager.IconContent.FleetExpedition;
 
-				tooltip.SetToolTip( label, string.Format( "{0} : {1}\r\n完了日時 : {2}", KCDatabase.Instance.Mission[fleet.ExpeditionDestination].ID, KCDatabase.Instance.Mission[fleet.ExpeditionDestination].Name, timer ) );
+				tooltip.SetToolTip( label, string.Format( "{0} : {1}\r\n完了日時 : {2}",
+					KCDatabase.Instance.Mission[fleet.ExpeditionDestination].ID,
+					KCDatabase.Instance.Mission[fleet.ExpeditionDestination].Name,
+					DateTimeHelper.TimeToCSVString( timer ) ) );
 
 				return FleetStates.Expedition;
 			}
@@ -582,12 +636,15 @@ namespace ElectronicObserver.Data {
 
 			//泊地修理中
 			{
-				if ( fleet.IsAnchorageRepairing ) {
+				if ( fleet.CanAnchorageRepairing &&
+					fleet.MembersInstance.Take( 2 + KCDatabase.Instance.Ships[fleet[0]].SlotInstanceMaster.Count( eq => eq != null && eq.CategoryType == 31 ) )
+					.Any( s => s != null && s.HPRate < 1.0 && s.HPRate > 0.5 && s.RepairingDockID == -1 ) ) {
 
 					label.Text = "泊地修理中 " + DateTimeHelper.ToTimeElapsedString( KCDatabase.Instance.Fleet.AnchorageRepairingTimer );
 					label.ImageIndex = (int)ResourceManager.IconContent.FleetAnchorageRepairing;
 
-					tooltip.SetToolTip( label, string.Format( "開始日時 : {0}", KCDatabase.Instance.Fleet.AnchorageRepairingTimer ) );
+					tooltip.SetToolTip( label, string.Format( "開始日時 : {0}",
+						DateTimeHelper.TimeToCSVString( KCDatabase.Instance.Fleet.AnchorageRepairingTimer ) ) );
 
 					return FleetStates.AnchorageRepairing;
 				}
@@ -595,8 +652,8 @@ namespace ElectronicObserver.Data {
 
 			//未補給
 			{
-				int fuel = fleet.MembersInstance.Sum( ship => ship == null ? 0 : (int)( ( ship.MasterShip.Fuel - ship.Fuel ) * ( ship.IsMarried ? 0.85 : 1.00 ) ) );
-				int ammo = fleet.MembersInstance.Sum( ship => ship == null ? 0 : (int)( ( ship.MasterShip.Ammo - ship.Ammo ) * ( ship.IsMarried ? 0.85 : 1.00 ) ) );
+				int fuel = fleet.MembersInstance.Sum( ship => ship == null ? 0 : (int)( ( ship.FuelMax - ship.Fuel ) * ( ship.IsMarried ? 0.85 : 1.00 ) ) );
+				int ammo = fleet.MembersInstance.Sum( ship => ship == null ? 0 : (int)( ( ship.AmmoMax - ship.Ammo ) * ( ship.IsMarried ? 0.85 : 1.00 ) ) );
 				int aircraft = fleet.MembersInstance.Sum(
 					ship => {
 						if ( ship == null ) return 0;
@@ -640,7 +697,7 @@ namespace ElectronicObserver.Data {
 						label.ImageIndex = (int)ResourceManager.IconContent.ConditionLittleTired;
 
 
-					tooltip.SetToolTip( label, string.Format( "回復目安日時: {0}", timer ) );
+					tooltip.SetToolTip( label, string.Format( "回復目安日時: {0}", DateTimeHelper.TimeToCSVString( timer ) ) );
 
 					return FleetStates.Tired;
 
@@ -682,12 +739,18 @@ namespace ElectronicObserver.Data {
 					break;
 				case FleetStates.Docking:
 					label.Text = "入渠中 " + DateTimeHelper.ToTimeRemainString( timer );
+					if ( Utility.Configuration.Config.FormFleet.BlinkAtCompletion && ( timer - DateTime.Now ).TotalMilliseconds <= Utility.Configuration.Config.NotifierRepair.AccelInterval )
+						label.BackColor = DateTime.Now.Second % 2 == 0 ? Color.LightGreen : Color.Transparent;
 					break;
 				case FleetStates.Expedition:
 					label.Text = "遠征中 " + DateTimeHelper.ToTimeRemainString( timer );
+					if ( Utility.Configuration.Config.FormFleet.BlinkAtCompletion && ( timer - DateTime.Now ).TotalMilliseconds <= Utility.Configuration.Config.NotifierExpedition.AccelInterval )
+						label.BackColor = DateTime.Now.Second % 2 == 0 ? Color.LightGreen : Color.Transparent;
 					break;
 				case FleetStates.Tired:
 					label.Text = "疲労 " + DateTimeHelper.ToTimeRemainString( timer );
+					if ( Utility.Configuration.Config.FormFleet.BlinkAtCompletion && ( timer - DateTime.Now ).TotalMilliseconds <= 0 )
+						label.BackColor = DateTime.Now.Second % 2 == 0 ? Color.LightGreen : Color.Transparent;
 					break;
 				case FleetStates.AnchorageRepairing:
 					label.Text = "泊地修理中 " + DateTimeHelper.ToTimeElapsedString( KCDatabase.Instance.Fleet.AnchorageRepairingTimer );
@@ -697,32 +760,18 @@ namespace ElectronicObserver.Data {
 		}
 
 
-		private bool CanAnchorageRepair {
+		/// <summary>
+		/// 泊地修理可能か
+		/// </summary>
+		public bool CanAnchorageRepairing {
 			get {
-				KCDatabase db = KCDatabase.Instance;
-				ShipData flagship = MembersInstance[0];
-				return (
-					ExpeditionState == 0 &&
-					flagship != null &&
-					flagship.MasterShip.ShipType == 19 &&	//旗艦工作艦
-					flagship.HPRate > 0.5 &&				//旗艦が中破未満
-					flagship.RepairingDockID == -1 &&		//旗艦が入渠中でない
-					MembersInstance.Take( 2 + flagship.SlotInstanceMaster.Count( eq => eq != null && eq.EquipmentType[2] == 31 ) ).Count( ship => {		//(2+装備)以内に50%<HP<100%&&非入渠中の艦がいる
-						if ( ship == null ) return false;
-						if ( ship.RepairingDockID != -1 ) return false;
-						return 0.5 < ship.HPRate && ship.HPRate < 1.0;
-					} ) > 0 );
+				ShipData flagship = KCDatabase.Instance.Ships[_members[0]];
+				return flagship != null && flagship.MasterShip.ShipType == 19;		//旗艦工作艦
 			}
 		}
 
-		public void UpdateAnchorageRepairingState() {
 
-			bool prev = IsAnchorageRepairing;
-			IsAnchorageRepairing = CanAnchorageRepair;
-			if ( !prev && IsAnchorageRepairing )
-				KCDatabase.Instance.Fleet.StartAnchorageRepairing();
 
-		}
 	}
 
 }

@@ -16,7 +16,7 @@
 * 艦隊(状態(遠征中, 未補給など), 制空戦力, 索敵能力)
     * 個艦(Lv, HP, コンディション, 補給, 装備スロット)
     * 艦隊一覧(全艦隊の状態を一目で確認できます)
-    * グループ(任意の艦娘の状態をグループ化して表示できます)
+    * グループ(フィルタリングで艦娘情報を表示)
 * 入渠(入渠艦, 残り時間)
 * 工廠(建造中の艦名, 残り時間)
 * 司令部(提督情報, 資源情報)
@@ -37,9 +37,9 @@
 
 *このリンクの更新は遅れる可能性があります。最新版は[こちら](http://electronicobserver.blog.fc2.com/)で確認してください。*  
 
-[ver. 1.4.0 (2015/06/17)](http://bit.ly/1GOwsMb)  
+[ver. 2.3.3 (2016/07/16)](http://bit.ly/29JT2xU)  
 
-更新内容・履歴は[こちら](https://github.com/andanteyk/ElectronicObserver/wiki/ChangeLog)で確認できます。  
+[更新内容・履歴はこちらで確認できます。](https://github.com/andanteyk/ElectronicObserver/wiki/ChangeLog)  
 
 ### 開発者の皆様へ
 ---
@@ -50,14 +50,16 @@
 また、実行する際は実行フォルダに気を付けてください。  
 Assets.zip をプログラムと同じ場所にコピーするか、実行フォルダの設定を変更してください。
 
-[ライセンスはこちらを参照してください。](https://github.com/andanteyk/ElectronicObserver/blob/master/LICENSE)  
+[ライセンスは MIT License です。](https://github.com/andanteyk/ElectronicObserver/blob/master/LICENSE)  
 
 ### 使用しているライブラリ
 ---
 
-* [DynamicJson](http://dynamicjson.codeplex.com/)
-* [DockPanel Suite](http://dockpanelsuite.com/)
-* [FiddlerCore](http://www.telerik.com/fiddler/fiddlercore)
+* [DynamicJson](http://dynamicjson.codeplex.com/) (JSON データの読み書き) - [Ms-PL](https://github.com/andanteyk/ElectronicObserver/blob/master/Licenses/Ms-PL.txt)
+* [DockPanel Suite](http://dockpanelsuite.com/) (ウィンドウレイアウト) - [MIT License](https://github.com/andanteyk/ElectronicObserver/blob/master/Licenses/DockPanelSuite.txt)
+* [Nekoxy](https://github.com/veigr/Nekoxy) (通信キャプチャ) - [MIT License](https://github.com/andanteyk/ElectronicObserver/blob/master/Licenses/Nekoxy.txt)
+    * [TrotiNet](http://trotinet.sourceforge.net/) - [GNU Lesser General Public License v3.0](https://github.com/andanteyk/ElectronicObserver/blob/master/Licenses/LGPL.txt)
+        * [log4net](https://logging.apache.org/log4net/) - [Apache License version 2.0](https://github.com/andanteyk/ElectronicObserver/blob/master/Licenses/Apache.txt)
 
 ### 連絡先など
 ---

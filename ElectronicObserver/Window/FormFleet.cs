@@ -1,4 +1,5 @@
-﻿using ElectronicObserver.Data;
+﻿using Codeplex.Data;
+using ElectronicObserver.Data;
 using ElectronicObserver.Observer;
 using ElectronicObserver.Resource;
 using ElectronicObserver.Utility.Data;
@@ -41,7 +42,6 @@ namespace ElectronicObserver.Window {
 				Name = new Label();
 				Name.Text = "[" + parent.FleetID.ToString() + "]";
 				Name.Anchor = AnchorStyles.Left;
-				Name.Font = parent.MainFont;
 				Name.ForeColor = parent.MainFontColor;
 				Name.Padding = new Padding( 0, 1, 0, 1 );
 				Name.Margin = new Padding( 2, 0, 2, 0 );
@@ -50,7 +50,6 @@ namespace ElectronicObserver.Window {
 
 				StateMain = new ImageLabel();
 				StateMain.Anchor = AnchorStyles.Left;
-				StateMain.Font = parent.MainFont;
 				StateMain.ForeColor = parent.MainFontColor;
 				StateMain.ImageList = ResourceManager.Instance.Icons;
 				StateMain.Padding = new Padding( 2, 2, 2, 2 );
@@ -59,7 +58,6 @@ namespace ElectronicObserver.Window {
 
 				AirSuperiority = new ImageLabel();
 				AirSuperiority.Anchor = AnchorStyles.Left;
-				AirSuperiority.Font = parent.MainFont;
 				AirSuperiority.ForeColor = parent.MainFontColor;
 				AirSuperiority.ImageList = ResourceManager.Instance.Equipments;
 				AirSuperiority.ImageIndex = (int)ResourceManager.EquipmentContent.CarrierBasedFighter;
@@ -69,13 +67,14 @@ namespace ElectronicObserver.Window {
 
 				SearchingAbility = new ImageLabel();
 				SearchingAbility.Anchor = AnchorStyles.Left;
-				SearchingAbility.Font = parent.MainFont;
 				SearchingAbility.ForeColor = parent.MainFontColor;
 				SearchingAbility.ImageList = ResourceManager.Instance.Equipments;
 				SearchingAbility.ImageIndex = (int)ResourceManager.EquipmentContent.CarrierBasedRecon;
 				SearchingAbility.Padding = new Padding( 2, 2, 2, 2 );
 				SearchingAbility.Margin = new Padding( 2, 0, 2, 0 );
 				SearchingAbility.AutoSize = true;
+
+				ConfigurationChanged( parent );
 
 				ToolTipInfo = parent.ToolTipInfo;
 				State = FleetData.FleetStates.NoShip;
@@ -122,21 +121,38 @@ namespace ElectronicObserver.Window {
 				Name.Text = fleet.Name;
 				{
 					int levelSum = fleet.MembersInstance.Sum( s => s != null ? s.Level : 0 );
-					int fueltotal = fleet.MembersInstance.Sum( s => s == null ? 0 : (int)( s.MasterShip.Fuel * ( s.IsMarried ? 0.85 : 1.00 ) ) );
-					int ammototal = fleet.MembersInstance.Sum( s => s == null ? 0 : (int)( s.MasterShip.Ammo * ( s.IsMarried ? 0.85 : 1.00 ) ) );
+
+					int fueltotal = fleet.MembersInstance.Sum( s => s == null ? 0 : (int)Math.Floor( s.FuelMax * ( s.IsMarried ? 0.85 : 1.00 ) ) );
+					int ammototal = fleet.MembersInstance.Sum( s => s == null ? 0 : (int)Math.Floor( s.AmmoMax * ( s.IsMarried ? 0.85 : 1.00 ) ) );
+
+					int fuelunit = fleet.MembersInstance.Sum( s => s == null ? 0 : (int)Math.Floor( s.MasterShip.Fuel * 0.2 * ( s.IsMarried ? 0.85 : 1.00 ) ) );
+					int ammounit = fleet.MembersInstance.Sum( s => s == null ? 0 : (int)Math.Floor( s.MasterShip.Ammo * 0.2 * ( s.IsMarried ? 0.85 : 1.00 ) ) );
+
 					int speed = fleet.MembersWithoutEscaped.Min( s => s == null ? 10 : s.MasterShip.Speed );
+
+					var slots = fleet.MembersWithoutEscaped
+						.Where( s => s != null )
+						.SelectMany( s => s.SlotInstance )
+						.Where( e => e != null );
+					var daihatsu = slots.Where( e => e.EquipmentID == 68 );
+					var daihatsu_tank = slots.Where( e => e.EquipmentID == 166 );
+					var landattacker = slots.Where( e => e.EquipmentID == 167 );
+					double expeditionBonus = Math.Min( daihatsu.Count() * 0.05 + daihatsu_tank.Count() * 0.02 + landattacker.Count() * 0.01, 0.20 );
+
 					ToolTipInfo.SetToolTip( Name, string.Format(
-						"Lv合計: {0} / 平均: {1:0.00}\r\n{2}艦隊\r\nドラム缶搭載: {3}個 ({4}艦)\r\n大発動艇搭載: {5}個\r\n総積載: 燃 {6} / 弾 {7}\r\n(1戦当たり 燃 {8} / 弾 {9})",
+						"Lv合計: {0} / 平均: {1:0.00}\r\n{2}艦隊\r\nドラム缶搭載: {3}個 ({4}艦)\r\n大発動艇搭載: {5}個 ({6}艦, +{7:p1})\r\n総積載: 燃 {8} / 弾 {9}\r\n(1戦当たり 燃 {10} / 弾 {11})",
 						levelSum,
 						(double)levelSum / Math.Max( fleet.Members.Count( id => id != -1 ), 1 ),
 						Constants.GetSpeed( speed ),
 						fleet.MembersInstance.Sum( s => s == null ? 0 : s.SlotInstanceMaster.Count( q => q == null ? false : q.CategoryType == 30 ) ),
-						fleet.MembersInstance.Count( s => s == null ? false : s.SlotInstanceMaster.Count( q => q == null ? false : q.CategoryType == 30 ) > 0 ),
-						fleet.MembersInstance.Sum( s => s == null ? 0 : s.SlotInstanceMaster.Count( q => q == null ? false : q.CategoryType == 24 ) ),
+						fleet.MembersInstance.Count( s => s == null ? false : s.SlotInstanceMaster.Any( q => q == null ? false : q.CategoryType == 30 ) ),
+						daihatsu.Count() + daihatsu_tank.Count() + landattacker.Count(),
+						fleet.MembersInstance.Count( s => s == null ? false : s.SlotInstanceMaster.Any( q => q == null ? false : q.CategoryType == 24 || q.CategoryType == 46 ) ),
+						expeditionBonus + 0.01 * expeditionBonus * ( daihatsu.Sum( e => e.Level ) + daihatsu_tank.Sum( e => e.Level ) + landattacker.Sum( e => e.Level ) ) / Math.Max( daihatsu.Count() + daihatsu_tank.Count() + landattacker.Count(), 1 ),
 						fueltotal,
 						ammototal,
-						(int)( fueltotal * 0.2 ),
-						(int)( ammototal * 0.2 )
+						fuelunit,
+						ammounit
 						) );
 
 				}
@@ -153,19 +169,36 @@ namespace ElectronicObserver.Window {
 						string.Format( "確保: {0}\r\n優勢: {1}\r\n均衡: {2}\r\n劣勢: {3}\r\n",
 						(int)( airSuperiority / 3.0 ),
 						(int)( airSuperiority / 1.5 ),
-						(int)( airSuperiority * 1.5 ),
-						(int)( airSuperiority * 3.0 ) ) );
+						(int)( airSuperiority * 1.5 - 1 ),
+						(int)( airSuperiority * 3.0 - 1 ) ) );
 				}
 
 
 				//索敵能力計算
 				SearchingAbility.Text = fleet.GetSearchingAbilityString();
-				ToolTipInfo.SetToolTip( SearchingAbility,
-					string.Format( "(旧)2-5式: {0}\r\n2-5式(秋): {1}\r\n2-5新秋簡易式: {2}\r\n",
-					fleet.GetSearchingAbilityString( 0 ),
-					fleet.GetSearchingAbilityString( 1 ),
-					fleet.GetSearchingAbilityString( 2 ) ) );
+				{
+					StringBuilder sb = new StringBuilder();
+					double probStart = fleet.GetContactProbability();
+					var probSelect = fleet.GetContactSelectionProbability();
 
+					sb.AppendFormat( "(旧)2-5式: {0}\r\n2-5式(秋): {1}\r\n2-5新秋簡易式: {2}\r\n判定式(33): {3}\r\n\r\n触接開始率: \r\n　確保 {4:p1} / 優勢 {5:p1}\r\n",
+						fleet.GetSearchingAbilityString( 0 ),
+						fleet.GetSearchingAbilityString( 1 ),
+						fleet.GetSearchingAbilityString( 2 ),
+						fleet.GetSearchingAbilityString( 3 ),
+						probStart,
+						probStart * 0.6 );
+
+					if ( probSelect.Count > 0 ) {
+						sb.AppendLine( "触接選択率: " );
+
+						foreach ( var p in probSelect.OrderBy( p => p.Key ) ) {
+							sb.AppendFormat( "　命中{0} : {1:p1}\r\n", p.Key, p.Value );
+						}
+					}
+
+					ToolTipInfo.SetToolTip( SearchingAbility, sb.ToString() );
+				}
 			}
 
 
@@ -179,6 +212,15 @@ namespace ElectronicObserver.Window {
 
 			}
 
+			public void ConfigurationChanged( FormFleet parent ) {
+				Name.Font = parent.MainFont;
+				StateMain.Font = parent.MainFont;
+				StateMain.BackColor = Color.Transparent;
+				AirSuperiority.Font = parent.MainFont;
+				AirSuperiority.Font = parent.MainFont;
+				SearchingAbility.Font = parent.MainFont;
+
+			}
 
 		}
 
@@ -205,7 +247,6 @@ namespace ElectronicObserver.Window {
 				Name.Anchor = AnchorStyles.Left;
 				Name.TextAlign = ContentAlignment.MiddleLeft;
 				Name.ImageAlign = ContentAlignment.MiddleCenter;
-				Name.Font = parent.MainFont;
 				Name.ForeColor = parent.MainFontColor;
 				Name.Padding = new Padding( 0, 1, 0, 1 );
 				Name.Margin = new Padding( 2, 0, 2, 0 );
@@ -220,10 +261,8 @@ namespace ElectronicObserver.Window {
 				Level.SuspendLayout();
 				Level.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
 				Level.Value = 0;
-				Level.MaximumValue = 150;
+				Level.MaximumValue = ExpTable.ShipMaximumLevel;
 				Level.ValueNext = 0;
-				Level.MainFont = parent.MainFont;
-				Level.SubFont = parent.SubFont;
 				Level.MainFontColor = parent.MainFontColor;
 				Level.SubFontColor = parent.SubFontColor;
 				//Level.TextNext = "n.";
@@ -231,7 +270,7 @@ namespace ElectronicObserver.Window {
 				Level.Margin = new Padding( 2, 0, 2, 1 );
 				Level.AutoSize = true;
 				Level.Visible = false;
-				Name.ResumeLayout();
+				Level.ResumeLayout();
 
 				HP = new ShipStatusHP();
 				HP.SuspendLayout();
@@ -240,8 +279,6 @@ namespace ElectronicObserver.Window {
 				HP.MaximumValue = 0;
 				HP.MaximumDigit = 999;
 				HP.UsePrevValue = false;
-				HP.MainFont = parent.MainFont;
-				HP.SubFont = parent.SubFont;
 				HP.MainFontColor = parent.MainFontColor;
 				HP.SubFontColor = parent.SubFontColor;
 				HP.Padding = new Padding( 0, 0, 0, 0 );
@@ -254,7 +291,6 @@ namespace ElectronicObserver.Window {
 				Condition.SuspendLayout();
 				Condition.Text = "*";
 				Condition.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-				Condition.Font = parent.MainFont;
 				Condition.ForeColor = parent.MainFontColor;
 				Condition.TextAlign = ContentAlignment.BottomRight;
 				Condition.ImageAlign = ContentAlignment.MiddleLeft;
@@ -285,13 +321,12 @@ namespace ElectronicObserver.Window {
 				Equipments.Anchor = AnchorStyles.Left;
 				Equipments.Padding = new Padding( 0, 2, 0, 1 );
 				Equipments.Margin = new Padding( 2, 0, 2, 0 );
-				Equipments.Font = parent.SubFont;
 				Equipments.Size = new Size( 40, 20 );
 				Equipments.AutoSize = true;
 				Equipments.Visible = false;
-				Equipments.ShowAircraft = Utility.Configuration.Config.FormFleet.ShowAircraft;
 				Equipments.ResumeLayout();
 
+				ConfigurationChanged( parent );
 
 				ToolTipInfo = parent.ToolTipInfo;
 				Parent = parent;
@@ -362,17 +397,19 @@ namespace ElectronicObserver.Window {
 
 					{
 						StringBuilder tip = new StringBuilder();
+						tip.AppendFormat( "Total: {0} exp.\r\n", ship.ExpTotal );
+
 						if ( !Utility.Configuration.Config.FormFleet.ShowNextExp )
-							tip.AppendFormat( "次のレベルまで: {0} exp.\n", ship.ExpNext );
+							tip.AppendFormat( "次のレベルまで: {0} exp.\r\n", ship.ExpNext );
 
 						if ( ship.MasterShip.RemodelAfterShipID != 0 && ship.Level < ship.MasterShip.RemodelAfterLevel ) {
-							tip.AppendFormat( "改装まで: Lv. {0} / {1} exp.", ship.MasterShip.RemodelAfterLevel - ship.Level, ship.ExpNextRemodel );
+							tip.AppendFormat( "改装まで: Lv. {0} / {1} exp.\r\n", ship.MasterShip.RemodelAfterLevel - ship.Level, ship.ExpNextRemodel );
 
 						} else if ( ship.Level <= 99 ) {
-							tip.AppendFormat( "Lv99まで: {0} exp.", Math.Max( ExpTable.GetExpToLevelShip( ship.ExpTotal, 99 ), 0 ) );
+							tip.AppendFormat( "Lv99まで: {0} exp.\r\n", Math.Max( ExpTable.GetExpToLevelShip( ship.ExpTotal, 99 ), 0 ) );
 
 						} else {
-							tip.AppendFormat( "Lv150まで: {0} exp.", Math.Max( ExpTable.GetExpToLevelShip( ship.ExpTotal, 150 ), 0 ) );
+							tip.AppendFormat( "Lv{0}まで: {1} exp.\r\n", ExpTable.ShipMaximumLevel, Math.Max( ExpTable.GetExpToLevelShip( ship.ExpTotal, ExpTable.ShipMaximumLevel ), 0 ) );
 
 						}
 
@@ -412,12 +449,9 @@ namespace ElectronicObserver.Window {
 
 						if ( ship.RepairTime > 0 ) {
 							var span = DateTimeHelper.FromAPITimeSpan( ship.RepairTime );
-							sb.AppendFormat( "入渠時間: {0}\n",
-								DateTimeHelper.ToTimeRemainString( span ) );
-							/*/
-							sb.AppendFormat( "( @ 1HP: {0} )\n",
-								DateTimeHelper.ToTimeRemainString( new TimeSpan( span.Ticks / ( ship.HPMax - ship.HPCurrent ) ) ) );
-							//*/
+							sb.AppendFormat( "入渠時間: {0} @ {1}",
+								DateTimeHelper.ToTimeRemainString( span ),
+								DateTimeHelper.ToTimeRemainString( new TimeSpan( span.Add( new TimeSpan( 0, 0, -30 ) ).Ticks / ( ship.HPMax - ship.HPCurrent ) ) ) );
 						}
 
 						ToolTipInfo.SetToolTip( HP, sb.ToString() );
@@ -444,7 +478,7 @@ namespace ElectronicObserver.Window {
 						ToolTipInfo.SetToolTip( Condition, string.Format( "あと {0} 回遠征可能", (int)Math.Ceiling( ( ship.Condition - 49 ) / 3.0 ) ) );
 					}
 
-					ShipResource.SetResources( ship.Fuel, ship.MasterShip.Fuel, ship.Ammo, ship.MasterShip.Ammo );
+					ShipResource.SetResources( ship.Fuel, ship.FuelMax, ship.Ammo, ship.AmmoMax );
 
 
 					Equipments.SetSlotList( ship );
@@ -478,16 +512,54 @@ namespace ElectronicObserver.Window {
 				StringBuilder sb = new StringBuilder();
 
 				for ( int i = 0; i < ship.Slot.Count; i++ ) {
-					if ( ship.SlotInstance[i] != null )
-						sb.AppendFormat( "[{0}/{1}] {2}\r\n", ship.Aircraft[i], ship.MasterShip.Aircraft[i], KCDatabase.Instance.Equipments[ship.Slot[i]].NameWithLevel );
+					var eq = ship.SlotInstance[i];
+					if ( eq != null )
+						sb.AppendFormat( "[{0}/{1}] {2}\r\n", ship.Aircraft[i], ship.MasterShip.Aircraft[i], eq.NameWithLevel );
 				}
 
+				{
+					var exslot = ship.ExpansionSlotInstance;
+					if ( exslot != null )
+						sb.AppendFormat( "補強: {0}\r\n", exslot.NameWithLevel );
+				}
 
 				int[] slotmaster = ship.SlotMaster.ToArray();
 
-				sb.AppendFormat( "\r\n昼戦: {0}\r\n夜戦: {1}\r\n",
-					Constants.GetDayAttackKind( Calculator.GetDayAttackKind( slotmaster, ship.ShipID, -1 ) ),
-					Constants.GetNightAttackKind( Calculator.GetNightAttackKind( slotmaster, ship.ShipID, -1 ) ) );
+				sb.AppendFormat( "\r\n昼戦: {0}", Constants.GetDayAttackKind( Calculator.GetDayAttackKind( slotmaster, ship.ShipID, -1 ) ) );
+				{
+					int shelling = ship.ShellingPower;
+					int aircraft = ship.AircraftPower;
+					if ( shelling > 0 ) {
+						if ( aircraft > 0 )
+							sb.AppendFormat( " - 砲撃: {0} / 空撃: {1}", shelling, aircraft );
+						else
+							sb.AppendFormat( " - 威力: {0}", shelling );
+					} else if ( aircraft > 0 )
+						sb.AppendFormat( " - 威力: {0}", aircraft );
+				}
+				sb.AppendLine();
+
+				sb.AppendFormat( "夜戦: {0}", Constants.GetNightAttackKind( Calculator.GetNightAttackKind( slotmaster, ship.ShipID, -1 ) ) );
+				{
+					int night = ship.NightBattlePower;
+					if ( night > 0 ) {
+						sb.AppendFormat( " - 威力: {0}", night );
+					}
+				}
+				sb.AppendLine();
+
+				{
+					int torpedo = ship.TorpedoPower;
+					int asw = ship.AntiSubmarinePower;
+					if ( torpedo > 0 ) {
+						if ( asw > 0 )
+							sb.AppendFormat( "雷撃: {0} / 対潜: {1}\r\n", torpedo, asw );
+						else
+							sb.AppendFormat( "雷撃: {0}\r\n", torpedo );
+					} else if ( asw > 0 )
+						sb.AppendFormat( "対潜: {0}\r\n", asw );
+				}
+
 				{
 					int aacutin = Calculator.GetAACutinKind( ship.ShipID, slotmaster );
 					if ( aacutin != 0 ) {
@@ -496,14 +568,29 @@ namespace ElectronicObserver.Window {
 				}
 				{
 					int airsup = Calculator.GetAirSuperiority( ship );
+					int airbattle = ship.AirBattlePower;
 					if ( airsup > 0 ) {
-						sb.AppendFormat( "制空戦力: {0}\r\n", airsup );
-					}
+						if ( airbattle > 0 )
+							sb.AppendFormat( "制空戦力: {0} / 航空威力: {1}\r\n", airsup, airbattle );
+						else
+							sb.AppendFormat( "制空戦力: {0}\r\n", airsup );
+					} else if ( airbattle > 0 )
+						sb.AppendFormat( "航空威力: {0}\r\n", airbattle );
 				}
 
 				return sb.ToString();
 			}
 
+
+			public void ConfigurationChanged( FormFleet parent ) {
+				Name.Font = parent.MainFont;
+				Level.MainFont = parent.MainFont;
+				Level.SubFont = parent.SubFont;
+				HP.MainFont = parent.MainFont;
+				HP.SubFont = parent.SubFont;
+				Condition.Font = parent.MainFont;
+				Equipments.Font = parent.SubFont;
+			}
 		}
 
 
@@ -574,6 +661,7 @@ namespace ElectronicObserver.Window {
 			o.APIList["api_req_kousyou/destroyship"].RequestReceived += ChangeOrganization;
 			o.APIList["api_req_kaisou/remodeling"].RequestReceived += ChangeOrganization;
 			o.APIList["api_req_kaisou/powerup"].ResponseReceived += ChangeOrganization;
+			o.APIList["api_req_hensei/preset_select"].ResponseReceived += ChangeOrganization;
 
 			o.APIList["api_req_nyukyo/start"].RequestReceived += Updated;
 			o.APIList["api_req_nyukyo/speedchange"].RequestReceived += Updated;
@@ -582,6 +670,7 @@ namespace ElectronicObserver.Window {
 			o.APIList["api_req_member/updatedeckname"].RequestReceived += Updated;
 			o.APIList["api_req_kaisou/remodeling"].RequestReceived += Updated;
 			o.APIList["api_req_map/start"].RequestReceived += Updated;
+			o.APIList["api_req_hensei/combined"].RequestReceived += Updated;
 
 			o.APIList["api_port/port"].ResponseReceived += Updated;
 			o.APIList["api_get_member/ship2"].ResponseReceived += Updated;
@@ -596,6 +685,10 @@ namespace ElectronicObserver.Window {
 			o.APIList["api_req_map/start"].ResponseReceived += Updated;
 			o.APIList["api_req_map/next"].ResponseReceived += Updated;
 			o.APIList["api_get_member/ship_deck"].ResponseReceived += Updated;
+			o.APIList["api_req_hensei/preset_select"].ResponseReceived += Updated;
+			o.APIList["api_req_kaisou/slot_exchange_index"].ResponseReceived += Updated;
+			o.APIList["api_get_member/require_info"].ResponseReceived += Updated;
+			o.APIList["api_req_kaisou/slot_deprive"].ResponseReceived += Updated;
 
 
 			//追加するときは FormFleetOverview にも同様に追加してください
@@ -686,7 +779,7 @@ namespace ElectronicObserver.Window {
 
 				sb.AppendFormat( "{0}/{1}\t", ship.MasterShip.Name, ship.Level );
 
-				var eq = ship.SlotInstance;
+				var eq = ship.AllSlotInstance;
 
 
 				if ( eq != null ) {
@@ -696,7 +789,7 @@ namespace ElectronicObserver.Window {
 
 						int count = 1;
 						for ( int k = j + 1; k < eq.Count; k++ ) {
-							if ( eq[k] != null && eq[k].EquipmentID == eq[j].EquipmentID && eq[k].Level == eq[j].Level ) {
+							if ( eq[k] != null && eq[k].EquipmentID == eq[j].EquipmentID && eq[k].Level == eq[j].Level && eq[k].AircraftLevel == eq[j].AircraftLevel ) {
 								count++;
 							} else {
 								break;
@@ -727,6 +820,70 @@ namespace ElectronicObserver.Window {
 
 		}
 
+
+
+		/// <summary>
+		/// 「艦隊デッキビルダー」用編成コピー
+		/// <see cref="http://www.kancolle-calc.net/deckbuilder.html"/>
+		/// </summary>
+		private void ContextMenuFleet_CopyFleetDeckBuilder_Click( object sender, EventArgs e ) {
+
+			StringBuilder sb = new StringBuilder();
+			KCDatabase db = KCDatabase.Instance;
+
+			// 手書き json の悲しみ
+
+			sb.Append( @"{""version"":4," );
+
+			foreach ( var fleet in db.Fleet.Fleets.Values ) {
+				if ( fleet == null ) continue;
+
+				sb.AppendFormat( @"""f{0}"":{{", fleet.FleetID );
+
+				int shipcount = 1;
+				foreach ( var ship in fleet.MembersInstance ) {
+					if ( ship == null ) break;
+
+					sb.AppendFormat( @"""s{0}"":{{""id"":{1},""lv"":{2},""luck"":{3},""items"":{{",
+						shipcount,
+						ship.ShipID,
+						ship.Level,
+						ship.LuckBase );
+
+					if ( ship.ExpansionSlot <= 0 )
+						sb.Append( @"""ix"":{}," );
+					else
+						sb.AppendFormat( @"""ix"":{{""id"":{0}}},", ship.ExpansionSlotMaster );
+
+					int eqcount = 1;
+					foreach ( var eq in ship.SlotInstance ) {
+						if ( eq == null ) break;
+
+						sb.AppendFormat( @"""i{0}"":{{""id"":{1},""rf"":{2},""mas"":{3}}},", eqcount, eq.EquipmentID, eq.Level, eq.AircraftLevel );
+
+						eqcount++;
+					}
+
+					if ( eqcount > 0 )
+						sb.Remove( sb.Length - 1, 1 );		// remove ","
+					sb.Append( @"}}," );
+
+					shipcount++;
+				}
+
+				if ( shipcount > 0 )
+					sb.Remove( sb.Length - 1, 1 );		// remove ","
+				sb.Append( @"}," );
+
+			}
+
+			sb.Remove( sb.Length - 1, 1 );		// remove ","
+			sb.Append( @"}" );
+
+			Clipboard.SetData( DataFormats.StringFormat, sb.ToString() );
+		}
+
+
 		private void ContextMenuFleet_Capture_Click( object sender, EventArgs e ) {
 
 			using ( Bitmap bitmap = new Bitmap( this.ClientSize.Width, this.ClientSize.Height ) ) {
@@ -750,6 +907,7 @@ namespace ElectronicObserver.Window {
 			ContextMenuFleet_FixShipNameWidth.Checked = c.FormFleet.FixShipNameWidth;
 
 			if ( ControlFleet != null && KCDatabase.Instance.Fleet[FleetID] != null ) {
+				ControlFleet.ConfigurationChanged( this );
 				ControlFleet.Update( KCDatabase.Instance.Fleet[FleetID] );
 			}
 
@@ -757,7 +915,10 @@ namespace ElectronicObserver.Window {
 				bool showAircraft = c.FormFleet.ShowAircraft;
 				bool fixShipNameWidth = c.FormFleet.FixShipNameWidth;
 				bool shortHPBar = c.FormFleet.ShortenHPBar;
+				bool colorMorphing = c.UI.BarColorMorphing;
+				Color[] colorScheme = c.UI.BarColorScheme.Select( col => col.ColorData ).ToArray();
 				bool showNext = c.FormFleet.ShowNextExp;
+				var levelVisibility = c.FormFleet.EquipmentLevelVisibility;
 
 				for ( int i = 0; i < ControlMember.Length; i++ ) {
 					ControlMember[i].Equipments.ShowAircraft = showAircraft;
@@ -769,12 +930,23 @@ namespace ElectronicObserver.Window {
 					}
 
 					ControlMember[i].HP.Text = shortHPBar ? "" : "HP:";
+					ControlMember[i].HP.HPBar.ColorMorphing = colorMorphing;
+					ControlMember[i].HP.HPBar.SetBarColorScheme( colorScheme );
 					ControlMember[i].Level.TextNext = showNext ? "next:" : null;
+					ControlMember[i].Equipments.LevelVisibility = levelVisibility;
+					ControlMember[i].ShipResource.BarFuel.ColorMorphing =
+					ControlMember[i].ShipResource.BarAmmo.ColorMorphing = colorMorphing;
+					ControlMember[i].ShipResource.BarFuel.SetBarColorScheme( colorScheme );
+					ControlMember[i].ShipResource.BarAmmo.SetBarColorScheme( colorScheme );
+
+					ControlMember[i].ConfigurationChanged( this );
 				}
 			}
 			TableMember.PerformLayout();		//fixme:サイズ変更に親パネルが追随しない
 
 		}
+
+
 
 
 		//よく考えたら別の艦隊タブと同期しないといけないので封印
@@ -797,6 +969,7 @@ namespace ElectronicObserver.Window {
 		protected override string GetPersistString() {
 			return "Fleet #" + FleetID.ToString();
 		}
+
 
 
 

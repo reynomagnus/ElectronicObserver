@@ -90,7 +90,9 @@ namespace ElectronicObserver.Data {
 				case 4:
 					return "SSホロ";
 				case 5:
-					return "EXホロ";
+					return "SSホロ'";
+				case 6:
+					return "SSホロ+";
 				default:
 					return "不明";
 			}
@@ -104,14 +106,16 @@ namespace ElectronicObserver.Data {
 				case 0:
 					return 1;
 				case 1:
-					return 4;
+					return 3;
 				case 2:
-					return 5;
+					return 4;
 				case 3:
-					return 6;
+					return 5;
 				case 4:
-					return 7;
+					return 6;
 				case 5:
+					return 7;
+				case 6:
 					return 8;
 				default:
 					return 0;
@@ -123,6 +127,7 @@ namespace ElectronicObserver.Data {
 		/// 艦船のボイス設定フラグを表す文字列を取得します。
 		/// </summary>
 		public static string GetVoiceFlag( int value ) {
+
 			switch ( value ) {
 				case 0:
 					return "-";
@@ -132,6 +137,14 @@ namespace ElectronicObserver.Data {
 					return "放置";
 				case 3:
 					return "時報+放置";
+				case 4:
+					return "特殊放置";
+				case 5:
+					return "時報+特殊放置";
+				case 6:
+					return "放置+特殊放置";
+				case 7:
+					return "時報+放置+特殊放置";
 				default:
 					return "不明";
 			}
@@ -195,6 +208,8 @@ namespace ElectronicObserver.Data {
 					return "航空戦";
 				case 8:
 					return "船団護衛成功";
+				case 9:
+					return "揚陸地点";
 				default:
 					return "不明";
 			}
@@ -216,10 +231,73 @@ namespace ElectronicObserver.Data {
 					return "夜昼戦";
 				case 4:
 					return "航空戦";
+				case 6:
+					return "空襲戦";
 				default:
 					return "不明";
 			}
 		}
+
+
+		/// <summary>
+		/// 海域難易度を表す文字列を取得します。
+		/// </summary>
+		public static string GetDifficulty( int value ) {
+
+			switch ( value ) {
+				case -1:
+					return "なし";
+				case 0:
+					return "未選択";
+				case 1:
+					return "丙";
+				case 2:
+					return "乙";
+				case 3:
+					return "甲";
+				default:
+					return "不明";
+			}
+		}
+
+		/// <summary>
+		/// 海域難易度を表す数値を取得します。
+		/// </summary>
+		public static int GetDifficulty( string value ) {
+
+			switch ( value ) {
+				case "未選択":
+					return 0;
+				case "丙":
+					return 1;
+				case "乙":
+					return 2;
+				case "甲":
+					return 3;
+				default:
+					return -1;
+			}
+
+		}
+
+		/// <summary>
+		/// 空襲被害の状態を表す文字列を取得します。
+		/// </summary>
+		public static string GetAirRaidDamage( int value ) {
+			switch ( value ) {
+				case 1:
+					return "空襲発生 - 資源に損害";
+				case 2:
+					return "空襲発生 - 資源・航空隊に損害";
+				case 3:
+					return "空襲発生 - 航空隊に損害";
+				case 4:
+					return "空襲発生 - 被害なし";
+				default:
+					return "空襲発生せず";
+			}
+		}
+
 
 		#endregion
 
@@ -251,6 +329,34 @@ namespace ElectronicObserver.Data {
 					return "第四警戒航行序列";
 				default:
 					return "不明";
+			}
+		}
+
+		/// <summary>
+		/// 陣形を表す数値を取得します。
+		/// </summary>
+		public static int GetFormation( string value ) {
+			switch ( value ) {
+				case "単縦陣":
+					return 1;
+				case "複縦陣":
+					return 2;
+				case "輪形陣":
+					return 3;
+				case "梯形陣":
+					return 4;
+				case "単横陣":
+					return 5;
+				case "第一警戒航行序列":
+					return 11;
+				case "第二警戒航行序列":
+					return 12;
+				case "第三警戒航行序列":
+					return 13;
+				case "第四警戒航行序列":
+					return 14;
+				default:
+					return -1;
 			}
 		}
 
@@ -463,6 +569,16 @@ namespace ElectronicObserver.Data {
 					return "高角砲/集中機銃";
 				case 12:
 					return "集中機銃/機銃/電探";
+				case 14:
+					return "高角砲/機銃/電探";
+				case 15:
+					return "高角砲/機銃";
+				case 16:
+					return "高角砲/機銃/電探";
+				case 17:
+					return "高角砲/機銃";
+				case 18:
+					return "集中機銃";
 				default:
 					return "不明";
 			}
@@ -588,18 +704,16 @@ namespace ElectronicObserver.Data {
 		/// </summary>
 		public static string GetQuestType( int id ) {
 			switch ( id ) {
-				case 1:		//一回限り
-					return "1";
-				case 2:		//デイリー
+				case 1:		//デイリー
 					return "日";
-				case 3:		//ウィークリー
+				case 2:		//ウィークリー
 					return "週";
-				case 4:		//敵空母を3隻撃沈せよ！(日付下一桁0|3|7)
-					return "変";
-				case 5:		//敵輸送船団を叩け！(日付下一桁2|8)
-					return "変";
-				case 6:		//マンスリー
+				case 3:		//マンスリー
 					return "月";
+				case 4:		//単発
+					return "単";
+				case 5:		//その他(輸送5/空母3)
+					return "他";
 				default:
 					return "?";
 			}
@@ -627,6 +741,8 @@ namespace ElectronicObserver.Data {
 				case 7:
 					return "改装";
 				case 8:
+					return "出撃";
+				case 9:
 					return "他";
 				default:
 					return "不明";
@@ -662,6 +778,8 @@ namespace ElectronicObserver.Data {
 					return "機動部隊";
 				case 2:
 					return "水上部隊";
+				case 3:
+					return "輸送部隊";
 				default:
 					return "不明";
 			}

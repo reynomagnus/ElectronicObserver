@@ -34,12 +34,14 @@
 			this.Menu_File_OpenFolder = new System.Windows.Forms.ToolStripMenuItem();
 			this.Menu_File_Reload = new System.Windows.Forms.ToolStripMenuItem();
 			this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+			this.ButtonSearchLastStart2 = new System.Windows.Forms.Button();
 			this.ButtonSearch = new System.Windows.Forms.Button();
 			this.TextFilter = new System.Windows.Forms.TextBox();
 			this.ButtonExecuteNext = new System.Windows.Forms.Button();
 			this.ButtonExecute = new System.Windows.Forms.Button();
 			this.FolderBrowser = new System.Windows.Forms.FolderBrowserDialog();
 			this.APICaller = new System.ComponentModel.BackgroundWorker();
+			this.ButtonSearchPrev = new System.Windows.Forms.Button();
 			((System.ComponentModel.ISupportInitialize)(this.APIView)).BeginInit();
 			this.ViewMenu.SuspendLayout();
 			this.menuStrip1.SuspendLayout();
@@ -65,7 +67,7 @@
 			this.APIView.RowHeadersVisible = false;
 			this.APIView.RowTemplate.Height = 21;
 			this.APIView.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-			this.APIView.Size = new System.Drawing.Size(624, 320);
+			this.APIView.Size = new System.Drawing.Size(624, 331);
 			this.APIView.TabIndex = 0;
 			// 
 			// APIView_FileName
@@ -83,12 +85,12 @@
             this.ViewMenu_Execute,
             this.ViewMenu_Delete});
 			this.ViewMenu.Name = "ContextMenu";
-			this.ViewMenu.Size = new System.Drawing.Size(226, 72);
+			this.ViewMenu.Size = new System.Drawing.Size(144, 48);
 			// 
 			// ViewMenu_Execute
 			// 
 			this.ViewMenu_Execute.Name = "ViewMenu_Execute";
-			this.ViewMenu_Execute.Size = new System.Drawing.Size(225, 34);
+			this.ViewMenu_Execute.Size = new System.Drawing.Size(143, 22);
 			this.ViewMenu_Execute.Text = "実行(&E)";
 			this.ViewMenu_Execute.Click += new System.EventHandler(this.ViewMenu_Execute_Click);
 			// 
@@ -96,7 +98,7 @@
 			// 
 			this.ViewMenu_Delete.Name = "ViewMenu_Delete";
 			this.ViewMenu_Delete.ShortcutKeys = System.Windows.Forms.Keys.Delete;
-			this.ViewMenu_Delete.Size = new System.Drawing.Size(225, 34);
+			this.ViewMenu_Delete.Size = new System.Drawing.Size(143, 22);
 			this.ViewMenu_Delete.Text = "削除(&D)";
 			this.ViewMenu_Delete.Click += new System.EventHandler(this.ViewMenu_Delete_Click);
 			// 
@@ -107,7 +109,7 @@
             this.Menu_File});
 			this.menuStrip1.Location = new System.Drawing.Point(0, 0);
 			this.menuStrip1.Name = "menuStrip1";
-			this.menuStrip1.Size = new System.Drawing.Size(624, 38);
+			this.menuStrip1.Size = new System.Drawing.Size(624, 24);
 			this.menuStrip1.TabIndex = 1;
 			this.menuStrip1.Text = "menuStrip1";
 			// 
@@ -117,27 +119,27 @@
             this.Menu_File_OpenFolder,
             this.Menu_File_Reload});
 			this.Menu_File.Name = "Menu_File";
-			this.Menu_File.Size = new System.Drawing.Size(128, 34);
+			this.Menu_File.Size = new System.Drawing.Size(70, 20);
 			this.Menu_File.Text = "ファイル(&F)";
 			// 
 			// Menu_File_OpenFolder
 			// 
 			this.Menu_File_OpenFolder.Name = "Menu_File_OpenFolder";
-			this.Menu_File_OpenFolder.Size = new System.Drawing.Size(273, 34);
+			this.Menu_File_OpenFolder.Size = new System.Drawing.Size(167, 22);
 			this.Menu_File_OpenFolder.Text = "フォルダを開く(&O)...";
 			this.Menu_File_OpenFolder.Click += new System.EventHandler(this.Menu_File_OpenFolder_Click);
 			// 
 			// Menu_File_Reload
 			// 
 			this.Menu_File_Reload.Name = "Menu_File_Reload";
-			this.Menu_File_Reload.Size = new System.Drawing.Size(273, 34);
+			this.Menu_File_Reload.Size = new System.Drawing.Size(167, 22);
 			this.Menu_File_Reload.Text = "再読み込み(&R)";
 			this.Menu_File_Reload.Click += new System.EventHandler(this.Menu_File_Reload_Click);
 			// 
 			// splitContainer1
 			// 
 			this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
-			this.splitContainer1.Location = new System.Drawing.Point(0, 38);
+			this.splitContainer1.Location = new System.Drawing.Point(0, 24);
 			this.splitContainer1.Name = "splitContainer1";
 			this.splitContainer1.Orientation = System.Windows.Forms.Orientation.Horizontal;
 			// 
@@ -147,18 +149,30 @@
 			// 
 			// splitContainer1.Panel2
 			// 
+			this.splitContainer1.Panel2.Controls.Add(this.ButtonSearchPrev);
+			this.splitContainer1.Panel2.Controls.Add(this.ButtonSearchLastStart2);
 			this.splitContainer1.Panel2.Controls.Add(this.ButtonSearch);
 			this.splitContainer1.Panel2.Controls.Add(this.TextFilter);
 			this.splitContainer1.Panel2.Controls.Add(this.ButtonExecuteNext);
 			this.splitContainer1.Panel2.Controls.Add(this.ButtonExecute);
-			this.splitContainer1.Size = new System.Drawing.Size(624, 403);
-			this.splitContainer1.SplitterDistance = 320;
+			this.splitContainer1.Size = new System.Drawing.Size(624, 417);
+			this.splitContainer1.SplitterDistance = 331;
 			this.splitContainer1.TabIndex = 2;
+			// 
+			// ButtonSearchLastStart2
+			// 
+			this.ButtonSearchLastStart2.Location = new System.Drawing.Point(174, 3);
+			this.ButtonSearchLastStart2.Name = "ButtonSearchLastStart2";
+			this.ButtonSearchLastStart2.Size = new System.Drawing.Size(80, 23);
+			this.ButtonSearchLastStart2.TabIndex = 4;
+			this.ButtonSearchLastStart2.Text = "Last start2";
+			this.ButtonSearchLastStart2.UseVisualStyleBackColor = true;
+			this.ButtonSearchLastStart2.Click += new System.EventHandler(this.ButtonSearchLastStart2_Click);
 			// 
 			// ButtonSearch
 			// 
 			this.ButtonSearch.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-			this.ButtonSearch.Location = new System.Drawing.Point(537, 31);
+			this.ButtonSearch.Location = new System.Drawing.Point(456, 32);
 			this.ButtonSearch.Name = "ButtonSearch";
 			this.ButtonSearch.Size = new System.Drawing.Size(75, 23);
 			this.ButtonSearch.TabIndex = 3;
@@ -172,7 +186,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
 			this.TextFilter.Location = new System.Drawing.Point(12, 32);
 			this.TextFilter.Name = "TextFilter";
-			this.TextFilter.Size = new System.Drawing.Size(519, 23);
+			this.TextFilter.Size = new System.Drawing.Size(438, 23);
 			this.TextFilter.TabIndex = 2;
 			this.TextFilter.KeyDown += new System.Windows.Forms.KeyEventHandler(this.TextFilter_KeyDown);
 			// 
@@ -201,6 +215,17 @@
 			this.APICaller.WorkerSupportsCancellation = true;
 			this.APICaller.DoWork += new System.ComponentModel.DoWorkEventHandler(this.APICaller_DoWork);
 			// 
+			// ButtonSearchPrev
+			// 
+			this.ButtonSearchPrev.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+			this.ButtonSearchPrev.Location = new System.Drawing.Point(537, 32);
+			this.ButtonSearchPrev.Name = "ButtonSearchPrev";
+			this.ButtonSearchPrev.Size = new System.Drawing.Size(75, 23);
+			this.ButtonSearchPrev.TabIndex = 5;
+			this.ButtonSearchPrev.Text = "前に検索";
+			this.ButtonSearchPrev.UseVisualStyleBackColor = true;
+			this.ButtonSearchPrev.Click += new System.EventHandler(this.ButtonSearchPrev_Click);
+			// 
 			// DialogLocalAPILoader2
 			// 
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
@@ -210,6 +235,7 @@
 			this.Font = new System.Drawing.Font("Meiryo UI", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Pixel);
 			this.MainMenuStrip = this.menuStrip1;
 			this.Name = "DialogLocalAPILoader2";
+			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
 			this.Text = "ファイルからAPIをロード";
 			this.Load += new System.EventHandler(this.DialogLocalAPILoader2_Load);
 			((System.ComponentModel.ISupportInitialize)(this.APIView)).EndInit();
@@ -244,5 +270,7 @@
 		private System.Windows.Forms.ToolStripMenuItem Menu_File_Reload;
 		private System.Windows.Forms.Button ButtonSearch;
 		private System.Windows.Forms.TextBox TextFilter;
+		private System.Windows.Forms.Button ButtonSearchLastStart2;
+		private System.Windows.Forms.Button ButtonSearchPrev;
 	}
 }

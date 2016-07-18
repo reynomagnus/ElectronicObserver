@@ -30,7 +30,7 @@ namespace ElectronicObserver.Window.Dialog {
 			TitleEvasion.ImageList =
 			TitleLOS.ImageList =
 			TitleAccuracy.ImageList =
-			TitleBomber.ImageList = 
+			TitleBomber.ImageList =
 			TitleSpeed.ImageList =
 			TitleRange.ImageList =
 			Rarity.ImageList =
@@ -41,7 +41,7 @@ namespace ElectronicObserver.Window.Dialog {
 				ResourceManager.Instance.Icons;
 
 			EquipmentType.ImageList = ResourceManager.Instance.Equipments;
-			
+
 			TitleFirepower.ImageIndex = (int)ResourceManager.IconContent.ParameterFirepower;
 			TitleTorpedo.ImageIndex = (int)ResourceManager.IconContent.ParameterTorpedo;
 			TitleAA.ImageIndex = (int)ResourceManager.IconContent.ParameterAA;
@@ -57,7 +57,7 @@ namespace ElectronicObserver.Window.Dialog {
 			MaterialAmmo.ImageIndex = (int)ResourceManager.IconContent.ResourceAmmo;
 			MaterialSteel.ImageIndex = (int)ResourceManager.IconContent.ResourceSteel;
 			MaterialBauxite.ImageIndex = (int)ResourceManager.IconContent.ResourceBauxite;
-			
+
 
 			BasePanelEquipment.Visible = false;
 
@@ -130,7 +130,7 @@ namespace ElectronicObserver.Window.Dialog {
 		private void EquipmentView_SortCompare( object sender, DataGridViewSortCompareEventArgs e ) {
 
 			if ( e.Column.Name == EquipmentView_Type.Name ) {
-				e.SortResult = 
+				e.SortResult =
 					KCDatabase.Instance.MasterEquipments[(int)EquipmentView.Rows[e.RowIndex1].Cells[0].Value].EquipmentType[2] -
 					KCDatabase.Instance.MasterEquipments[(int)EquipmentView.Rows[e.RowIndex2].Cells[0].Value].EquipmentType[2];
 			} else {
@@ -162,7 +162,7 @@ namespace ElectronicObserver.Window.Dialog {
 		}
 
 
-		
+
 		private void EquipmentView_CellMouseClick( object sender, DataGridViewCellMouseEventArgs e ) {
 
 			if ( e.RowIndex >= 0 ) {
@@ -203,19 +203,19 @@ namespace ElectronicObserver.Window.Dialog {
 
 
 			TableEquipmentName.SuspendLayout();
-			
-			EquipmentType.Text = db.EquipmentTypes[eq.EquipmentType[2]].Name; 
-			
+
+			EquipmentType.Text = db.EquipmentTypes[eq.EquipmentType[2]].Name;
+
 			{
 				int eqicon = eq.EquipmentType[3];
 				if ( eqicon >= (int)ResourceManager.EquipmentContent.Locked )
 					eqicon = (int)ResourceManager.EquipmentContent.Unknown;
 				EquipmentType.ImageIndex = eqicon;
-			
+
 				StringBuilder sb = new StringBuilder();
 				sb.AppendLine( "装備可能艦種:" );
 				foreach ( var stype in KCDatabase.Instance.ShipTypes.Values ) {
-					if ( stype.EquipmentType[eq.EquipmentType[2]] )
+					if ( stype.EquipmentType.Contains( eq.EquipmentType[2] ) )
 						sb.AppendLine( stype.Name );
 				}
 				ToolTipInfo.SetToolTip( EquipmentType, sb.ToString() );
@@ -350,8 +350,8 @@ namespace ElectronicObserver.Window.Dialog {
 			e.Graphics.DrawLine( Pens.Silver, e.CellBounds.X, e.CellBounds.Bottom - 1, e.CellBounds.Right - 1, e.CellBounds.Bottom - 1 );
 		}
 
-		
-		
+
+
 		private void TableArsenal_CellPaint( object sender, TableLayoutCellPaintEventArgs e ) {
 			e.Graphics.DrawLine( Pens.Silver, e.CellBounds.X, e.CellBounds.Bottom - 1, e.CellBounds.Right - 1, e.CellBounds.Bottom - 1 );
 		}
@@ -367,8 +367,8 @@ namespace ElectronicObserver.Window.Dialog {
 
 					using ( StreamWriter sw = new StreamWriter( SaveCSVDialog.FileName, false, Utility.Configuration.Config.Log.FileEncoding ) ) {
 
-						sw.WriteLine( "装備ID,図鑑番号,装備種,装備名,装備種1,装備種2,装備種3,装備種4,火力,雷装,対空,装甲,対潜,回避,索敵,運,命中,爆装,射程,レア,廃棄燃料,廃棄弾薬,廃棄鋼材,廃棄ボーキ,図鑑文章,バージョン" );
-						string arg = string.Format( "{{{0}}}", string.Join( "},{", Enumerable.Range( 0, 26 ) ) );
+						sw.WriteLine( "装備ID,図鑑番号,装備種,装備名,装備種1,装備種2,装備種3,装備種4,火力,雷装,対空,装甲,対潜,回避,索敵,運,命中,爆装,射程,レア,廃棄燃料,廃棄弾薬,廃棄鋼材,廃棄ボーキ,図鑑文章,戦闘行動半径,配置コスト" );
+						string arg = string.Format( "{{{0}}}", string.Join( "},{", Enumerable.Range( 0, 27 ) ) );
 
 						foreach ( EquipmentDataMaster eq in KCDatabase.Instance.MasterEquipments.Values ) {
 
@@ -398,7 +398,8 @@ namespace ElectronicObserver.Window.Dialog {
 								eq.Material[2],
 								eq.Material[3],
 								eq.Message.Replace( "\n", "<br>" ),
-								eq.ResourceVersion
+								eq.AircraftDistance,
+								eq.AircraftCost
 								);
 
 						}
@@ -425,8 +426,8 @@ namespace ElectronicObserver.Window.Dialog {
 
 					using ( StreamWriter sw = new StreamWriter( SaveCSVDialog.FileName, false, Utility.Configuration.Config.Log.FileEncoding ) ) {
 
-						sw.WriteLine( "装備ID,図鑑番号,装備名,装備種1,装備種2,装備種3,装備種4,火力,雷装,対空,装甲,対潜,回避,索敵,運,命中,爆装,射程,レア,廃棄燃料,廃棄弾薬,廃棄鋼材,廃棄ボーキ,図鑑文章,バージョン" );
-						string arg = string.Format( "{{{0}}}", string.Join( "},{", Enumerable.Range( 0, 24 ) ) );
+						sw.WriteLine( "装備ID,図鑑番号,装備名,装備種1,装備種2,装備種3,装備種4,火力,雷装,対空,装甲,対潜,回避,索敵,運,命中,爆装,射程,レア,廃棄燃料,廃棄弾薬,廃棄鋼材,廃棄ボーキ,図鑑文章,戦闘行動半径,配置コスト" );
+						string arg = string.Format( "{{{0}}}", string.Join( "},{", Enumerable.Range( 0, 26 ) ) );
 
 						foreach ( EquipmentDataMaster eq in KCDatabase.Instance.MasterEquipments.Values ) {
 
@@ -455,7 +456,8 @@ namespace ElectronicObserver.Window.Dialog {
 								eq.Material[2],
 								eq.Material[3],
 								eq.Message.Replace( "\n", "<br>" ),
-								eq.ResourceVersion
+								eq.AircraftDistance,
+								eq.AircraftCost
 								);
 
 						}
@@ -480,6 +482,6 @@ namespace ElectronicObserver.Window.Dialog {
 
 		}
 
-		
+
 	}
 }
